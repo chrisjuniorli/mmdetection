@@ -110,6 +110,8 @@ data
 .vscode
 .idea
 
+# workdir
+work_dir
 # custom
 *.pkl
 *.pkl.json

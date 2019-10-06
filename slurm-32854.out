@@ -818,3 +818,11 @@ index created!
 2019-10-06 11:55:46,941 - INFO - Epoch [3][10400/14659]	lr: 0.01000, eta: 1 day, 12:45:54, time: 0.967, data_time: 0.006, memory: 5458, loss_cls: 0.3245, loss_bbox: 0.1669, loss: 0.4914
 2019-10-06 11:56:35,331 - INFO - Epoch [3][10450/14659]	lr: 0.01000, eta: 1 day, 12:45:04, time: 0.968, data_time: 0.006, memory: 5458, loss_cls: 0.3612, loss_bbox: 0.1685, loss: 0.5296
 2019-10-06 11:57:23,592 - INFO - Epoch [3][10500/14659]	lr: 0.01000, eta: 1 day, 12:44:15, time: 0.965, data_time: 0.006, memory: 5458, loss_cls: 0.3634, loss_bbox: 0.1649, loss: 0.5283
+2019-10-06 11:58:12,249 - INFO - Epoch [3][10550/14659]	lr: 0.01000, eta: 1 day, 12:43:26, time: 0.973, data_time: 0.006, memory: 5458, loss_cls: 0.3489, loss_bbox: 0.1659, loss: 0.5148
+2019-10-06 11:59:00,914 - INFO - Epoch [3][10600/14659]	lr: 0.01000, eta: 1 day, 12:42:38, time: 0.973, data_time: 0.006, memory: 5458, loss_cls: 0.3632, loss_bbox: 0.1838, loss: 0.5470
+2019-10-06 11:59:49,140 - INFO - Epoch [3][10650/14659]	lr: 0.01000, eta: 1 day, 12:41:48, time: 0.965, data_time: 0.006, memory: 5458, loss_cls: 0.3539, loss_bbox: 0.1646, loss: 0.5185
+2019-10-06 12:00:37,534 - INFO - Epoch [3][10700/14659]	lr: 0.01000, eta: 1 day, 12:40:59, time: 0.968, data_time: 0.006, memory: 5458, loss_cls: 0.3629, loss_bbox: 0.1743, loss: 0.5372
+2019-10-06 12:01:25,844 - INFO - Epoch [3][10750/14659]	lr: 0.01000, eta: 1 day, 12:40:09, time: 0.966, data_time: 0.006, memory: 5458, loss_cls: 0.3339, loss_bbox: 0.1731, loss: 0.5070
+2019-10-06 12:02:13,922 - INFO - Epoch [3][10800/14659]	lr: 0.01000, eta: 1 day, 12:39:19, time: 0.962, data_time: 0.006, memory: 5458, loss_cls: 0.3647, loss_bbox: 0.1762, loss: 0.5409
+2019-10-06 12:03:02,292 - INFO - Epoch [3][10850/14659]	lr: 0.01000, eta: 1 day, 12:38:30, time: 0.967, data_time: 0.006, memory: 5458, loss_cls: 0.3421, loss_bbox: 0.1658, loss: 0.5080
+2019-10-06 12:03:50,360 - INFO - Epoch [3][10900/14659]	lr: 0.01000, eta: 1 day, 12:37:39, time: 0.961, data_time: 0.006, memory: 5458, loss_cls: 0.3757, loss_bbox: 0.1862, loss: 0.5620

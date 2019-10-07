@@ -123,3 +123,5 @@ work_dirs/
 
 # slurm outputs
 *.out
+#batch_output
+batch_outputs

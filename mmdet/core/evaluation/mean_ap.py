@@ -4,7 +4,7 @@ from terminaltables import AsciiTable
 
 from .bbox_overlaps import bbox_overlaps
 from .class_names import get_classes
-
+import pdb
 
 def average_precision(recalls, precisions, mode='area'):
     """Calculate average precision (for single or multiple scales).
@@ -364,6 +364,7 @@ def print_map_summary(mean_ap, results, dataset=None):
     if not isinstance(mean_ap, list):
         mean_ap = [mean_ap]
     header = ['class', 'gts', 'dets', 'recall', 'precision', 'ap']
+    print(num_scales)
     for i in range(num_scales):
         table_data = [header]
         for j in range(num_classes):
@@ -376,4 +377,10 @@ def print_map_summary(mean_ap, results, dataset=None):
         table_data.append(['mAP', '', '', '', '', '{:.3f}'.format(mean_ap[i])])
         table = AsciiTable(table_data)
         table.inner_footing_row_border = True
+        #pdb.set_trace()
         print(table.table)
+    #fileObject = open('/ifp/users/jiachenl/mmdetection/scripts/voc.txt', 'w')
+    #for ip in table_data:
+    #    fileObject.write(ip)
+    #    fileObject.write('\n')
+    #fileObject.close()

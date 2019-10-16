@@ -54,6 +54,8 @@ def main():
         help='IoU threshold for evaluation')
     args = parser.parse_args()
     cfg = mmcv.Config.fromfile(args.config)
+    print(cfg.data.test)
+    print(datasets)
     test_dataset = mmcv.runner.obj_from_dict(cfg.data.test, datasets)
     voc_eval(args.result, test_dataset, args.iou_thr)
 

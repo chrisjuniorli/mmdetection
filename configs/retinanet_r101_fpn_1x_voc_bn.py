@@ -2,12 +2,13 @@
 model = dict(
     type='RetinaNet',
     pretrained='torchvision://resnet101',
-    backbone=dict(
+    backbone=dict(  
         type='ResNet',
         depth=101,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
+        norm_cfg=dict(type='BN', requires_grad=False),
         style='pytorch'),
     neck=dict(
         type='FPN',
@@ -136,7 +137,7 @@ log_config = dict(
 total_epochs = 8
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/retinanet_r101_fpn_1x_voc'
+work_dir = './work_dirs/retinanet_r101_fpn_1x_voc_bn'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

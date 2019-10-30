@@ -1,6 +1,6 @@
-# model settings
+#model settings
 model = dict(
-    type='FCOS',
+    type = 'AnchorFree',
     pretrained='open-mmlab://resnet101_caffe',
     backbone=dict(
         type='ResNet',
@@ -18,23 +18,23 @@ model = dict(
         add_extra_convs=True,
         extra_convs_on_inputs=False,  # use P5
         num_outs=5,
-        relu_before_extra_convs=True),
-    bbox_head=dict(
-        type='FCOSHead',
+        relu_before_extra_convs=True),  
+    bbox_head = dict(
+        type='AnchorFreeHead',
         num_classes=21,
         in_channels=256,
         stacked_convs=4,
         feat_channels=256,
         strides=[8, 16, 32, 64, 128],
         loss_cls=dict(
-            type='FocalLoss',
+            type='FocalLoss_py',
             use_sigmoid=True,
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
-        loss_bbox=dict(type='IoULoss', loss_weight=1.0),
-        loss_centerness=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
+        loss_bbox=dict(type='IoULoss', loss_weight=1.0)))
+ #       loss_centerness=dict(
+ #           type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
 # training and testing settings
 train_cfg = dict(
     assigner=dict(
@@ -52,8 +52,6 @@ test_cfg = dict(
     score_thr=0.05,
     nms=dict(type='nms', iou_thr=0.5),
     max_per_img=100)
-# dataset settings
-#dataset_type = 'CocoDataset'
 #data_root = 'data/coco/'
 dataset_type = 'VOCDataset'
 data_root = 'data/VOCdevkit/'
@@ -94,16 +92,13 @@ data = dict(
     imgs_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
-        type='RepeatDataset',
-        times=3,
-        dataset=dict(
-            type=dataset_type,
+        type=dataset_type,
             ann_file=[
                 data_root + 'VOC2007/ImageSets/Main/trainval.txt',
                 data_root + 'VOC2012/ImageSets/Main/trainval.txt'
             ],
             img_prefix=[data_root + 'VOC2007/', data_root + 'VOC2012/'],
-            pipeline=train_pipeline)),
+            pipeline=train_pipeline),
     val=dict(
         type=dataset_type,
         ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
@@ -126,8 +121,8 @@ optimizer_config = dict(grad_clip=None)
 lr_config = dict(
     policy='step',
     warmup='constant',
-    warmup_iters=500,
-    warmup_ratio=1.0 / 3,
+    warmup_iters=1500,
+    warmup_ratio=1.0 / 4,
     step=[5, 7])
 checkpoint_config = dict(interval=1)
 
@@ -143,7 +138,7 @@ log_config = dict(
 total_epochs = 8  # actual epoch = 8 * 3 = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_mstrain_640_800_r101_caffe_fpn_gn_2x_4gpu_voc'
+work_dir = './work_dirs/anchorfree_r101_voc_baseline_test_pyfocalloss_bn8'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

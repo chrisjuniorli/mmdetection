@@ -3,7 +3,7 @@ from .single_stage import SingleStageDetector
 
 
 @DETECTORS.register_module
-class Cascade_AnchorFree(SingleStageDetector):
+class SampleAnchorFree(SingleStageDetector):
 
     def __init__(self,
                  backbone,
@@ -12,5 +12,5 @@ class Cascade_AnchorFree(SingleStageDetector):
                  train_cfg=None,
                  test_cfg=None,
                  pretrained=None):
-        super(Cascade_AnchorFree, self).__init__(backbone, neck, bbox_head, train_cfg,
+        super(SampleAnchorFree, self).__init__(backbone, neck, bbox_head, train_cfg,
                                    test_cfg, pretrained)

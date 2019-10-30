@@ -6,11 +6,12 @@ from mmdet.core import distance2bbox, force_fp32, multi_apply, multiclass_nms
 from ..builder import build_loss
 from ..registry import HEADS
 from ..utils import ConvModule, Scale, bias_init_with_prob
+import pdb
 
 INF = 1e8
 
 @HEADS.register_module
-class AnchorFreeHead(nn.Module):
+class SampleAnchorFreeHead(nn.Module):
 
     def __init__(self,
                  num_classes,
@@ -27,13 +28,10 @@ class AnchorFreeHead(nn.Module):
                      alpha=0.25,
                      loss_weight=1.0),
                  loss_bbox=dict(type='IoULoss', loss_weight=1.0),
-                # loss_centerness=dict(
-                #     type='CrossEntropyLoss',
-                #     use_sigmoid=True,
-               #      loss_weight=1.0),
+                 sample_threshold = 0.5,
                  conv_cfg=None,
                  norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)):
-        super(AnchorFreeHead, self).__init__()
+        super(SampleAnchorFreeHead, self).__init__()
 
         self.num_classes = num_classes
         self.cls_out_channels = num_classes - 1
@@ -47,6 +45,7 @@ class AnchorFreeHead(nn.Module):
         #self.loss_centerness = build_loss(loss_centerness)
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
+        self.sample_threshold = sample_threshold
         self.fp16_enabled = False
 
         self._init_layers()
@@ -55,6 +54,7 @@ class AnchorFreeHead(nn.Module):
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         for i in range(self.stacked_convs):
+            #four consecutive conv layers
             chn = self.in_channels if i == 0 else self.feat_channels
             self.cls_convs.append(
                 ConvModule(
@@ -80,8 +80,7 @@ class AnchorFreeHead(nn.Module):
             self.feat_channels, self.cls_out_channels, 3, padding=1)
         self.fcos_reg = nn.Conv2d(self.feat_channels, 4, 3, padding=1)
         #self.fcos_centerness = nn.Conv2d(self.feat_channels, 1, 3, padding=1)
-
-        self.scales = nn.ModuleList([Scale(1.0) for _ in self.x])
+        self.scales = nn.ModuleList([Scale(1.0) for _ in self.strides])
 
     def init_weights(self):
         for m in self.cls_convs:
@@ -108,9 +107,10 @@ class AnchorFreeHead(nn.Module):
         for reg_layer in self.reg_convs:
             reg_feat = reg_layer(reg_feat)
         # scale the bbox_pred of different level
+        
         # float to avoid overflow when enabling FP16
         bbox_pred = scale(self.fcos_reg(reg_feat)).float().exp()
-       # return cls_score, bbox_pred, centerness
+       # return cls_score, bbox_pred
         return cls_score, bbox_pred
 
     #@force_fp32(apply_to=('cls_scores', 'bbox_preds', 'centernesses'))
@@ -125,12 +125,15 @@ class AnchorFreeHead(nn.Module):
              cfg,
              gt_bboxes_ignore=None):
         assert len(cls_scores) == len(bbox_preds) #== len(centernesses)
+        #　【-2:】 could get [height,width]
+        #cls_scores & bbox_preds are outputs
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                            bbox_preds[0].device)
+        #with points, [points+bbox] pred could apply for bbox_pred loss
         labels, bbox_targets = self.fcos_target(all_level_points, gt_bboxes,
                                                 gt_labels)
-
+        
         num_imgs = cls_scores[0].size(0)
         # flatten cls_scores, bbox_preds and centerness
         flatten_cls_scores = [
@@ -145,16 +148,33 @@ class AnchorFreeHead(nn.Module):
        #     centerness.permute(0, 2, 3, 1).reshape(-1)
        #     for centerness in centernesses
         #]
+        
         flatten_cls_scores = torch.cat(flatten_cls_scores)
         flatten_bbox_preds = torch.cat(flatten_bbox_preds)
        # flatten_centerness = torch.cat(flatten_centerness)
+    
         flatten_labels = torch.cat(labels)
         flatten_bbox_targets = torch.cat(bbox_targets)
+        
         # repeat points to align with bbox_preds
         flatten_points = torch.cat(
             [points.repeat(num_imgs, 1) for points in all_level_points])
-
-        pos_inds = flatten_labels.nonzero().reshape(-1)
+        
+        #!!!!positive samples assign with sampler!!!!
+        pos_inds_tem = flatten_labels.nonzero().reshape(-1)
+       # pdb.set_trace()
+        pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
+        left_right = pos_bbox_targets_tem[:, [0, 2]]
+        top_bottom = pos_bbox_targets_tem[:, [1, 3]]
+        centerness_targets = (
+            left_right.min(dim=-1)[0] / left_right.max(dim=-1)[0]) * (
+                top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
+        
+        sample_threshold = self.sample_threshold
+        pos_inds = pos_inds_tem[centerness_targets>sample_threshold]
+        pos_inds_ignore = pos_inds_tem[centerness_targets<=sample_threshold]
+        flatten_labels[pos_inds_ignore] = 0
+        
         num_pos = len(pos_inds)
         loss_cls = self.loss_cls(
             flatten_cls_scores, flatten_labels,
@@ -170,12 +190,12 @@ class AnchorFreeHead(nn.Module):
             pos_decoded_bbox_preds = distance2bbox(pos_points, pos_bbox_preds)
             pos_decoded_target_preds = distance2bbox(pos_points,
                                                      pos_bbox_targets)
-            # centerness weighted iou loss
+            
             loss_bbox = self.loss_bbox(
                 pos_decoded_bbox_preds,
-                pos_decoded_target_preds,
-               # weight=pos_centerness_targets,
-               # avg_factor=pos_centerness_targets.sum())
+                pos_decoded_target_preds)
+           #     weight=pos_centerness_targets,
+           #     avg_factor=pos_centerness_targets.sum())
            # loss_centerness = self.loss_centerness(pos_centerness,
            #                                        pos_centerness_targets)
         else:
@@ -184,11 +204,11 @@ class AnchorFreeHead(nn.Module):
 
         return dict(
             loss_cls=loss_cls,
-            loss_bbox=loss_bbox,)
+            loss_bbox=loss_bbox)
           #  loss_centerness=loss_centerness)
 
     #@force_fp32(apply_to=('cls_scores', 'bbox_preds', 'centernesses'))
-    @force_fp32(apply_to=('cls_scores', 'bbox_preds'])
+    @force_fp32(apply_to=('cls_scores', 'bbox_preds'))
     def get_bboxes(self,
                    cls_scores,
                    bbox_preds,
@@ -287,6 +307,7 @@ class AnchorFreeHead(nn.Module):
             tuple: points of each image.
         """
         mlvl_points = []
+        #get points of each featmap
         for i in range(len(featmap_sizes)):
             mlvl_points.append(
                 self.get_points_single(featmap_sizes[i], self.strides[i],
@@ -294,6 +315,7 @@ class AnchorFreeHead(nn.Module):
         return mlvl_points
 
     def get_points_single(self, featmap_size, stride, dtype, device):
+        # return [[x,y]] location of points on a single feature map at the original image
         h, w = featmap_size
         x_range = torch.arange(
             0, w * stride, stride, dtype=dtype, device=device)
@@ -306,16 +328,21 @@ class AnchorFreeHead(nn.Module):
 
     def fcos_target(self, points, gt_bboxes_list, gt_labels_list):
         assert len(points) == len(self.regress_ranges)
+        #num_levels mean the levels of all feature maps
         num_levels = len(points)
         # expand regress ranges to align with points
         expanded_regress_ranges = [
             points[i].new_tensor(self.regress_ranges[i])[None].expand_as(
                 points[i]) for i in range(num_levels)
         ]
+        
         # concat all levels points and regress ranges
         concat_regress_ranges = torch.cat(expanded_regress_ranges, dim=0)
         concat_points = torch.cat(points, dim=0)
+        
         # get labels and bbox_targets of each image
+        
+        # use multi_apply() could put every set of parameters in *args to the first function (with the same **kwargs)
         labels_list, bbox_targets_list = multi_apply(
             self.fcos_target_single,
             gt_bboxes_list,
@@ -343,17 +370,23 @@ class AnchorFreeHead(nn.Module):
         return concat_lvl_labels, concat_lvl_bbox_targets
 
     def fcos_target_single(self, gt_bboxes, gt_labels, points, regress_ranges):
+        #num of all points
         num_points = points.size(0)
+        #num of all gts
         num_gts = gt_labels.size(0)
         if num_gts == 0:
             return gt_labels.new_zeros(num_points), \
                    gt_bboxes.new_zeros((num_points, 4))
-
+        
+        # areas of all gt bboxes
         areas = (gt_bboxes[:, 2] - gt_bboxes[:, 0] + 1) * (
             gt_bboxes[:, 3] - gt_bboxes[:, 1] + 1)
+        
+       
         # TODO: figure out why these two are different
         # areas = areas[None].expand(num_points, num_gts)
         areas = areas[None].repeat(num_points, 1)
+        
         regress_ranges = regress_ranges[:, None, :].expand(
             num_points, num_gts, 2)
         gt_bboxes = gt_bboxes[None].expand(num_points, num_gts, 4)
@@ -365,6 +398,8 @@ class AnchorFreeHead(nn.Module):
         right = gt_bboxes[..., 2] - xs
         top = ys - gt_bboxes[..., 1]
         bottom = gt_bboxes[..., 3] - ys
+        
+        # from the points(xs,ys) to generate the gt_targets(l,r,t,b)
         bbox_targets = torch.stack((left, top, right, bottom), -1)
 
         # condition1: inside a gt bbox
@@ -375,13 +410,15 @@ class AnchorFreeHead(nn.Module):
         inside_regress_range = (
             max_regress_distance >= regress_ranges[..., 0]) & (
                 max_regress_distance <= regress_ranges[..., 1])
-
+        
         # if there are still more than one objects for a location,
         # we choose the one with minimal area
+        # use INF to delete those points outsite a gt bbox or exceed the regression range
+        # in the next areas.min operation
         areas[inside_gt_bbox_mask == 0] = INF
         areas[inside_regress_range == 0] = INF
         min_area, min_area_inds = areas.min(dim=1)
-
+        
         labels = gt_labels[min_area_inds]
         labels[min_area == INF] = 0
         bbox_targets = bbox_targets[range(num_points), min_area_inds]

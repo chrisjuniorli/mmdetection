@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 
-
 class Scale(nn.Module):
 
     def __init__(self, scale=1.0):

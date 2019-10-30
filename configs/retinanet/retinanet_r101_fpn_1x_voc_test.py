@@ -1,8 +1,8 @@
 # model settings
 model = dict(
-    type='FCOS',
+    type='RetinaNet',
     pretrained='torchvision://resnet101',
-    backbone=dict(
+    backbone=dict(  
         type='ResNet',
         depth=101,
         num_stages=4,
@@ -16,25 +16,26 @@ model = dict(
         out_channels=256,
         start_level=1,
         add_extra_convs=True,
-        extra_convs_on_inputs=False,  # use P5
-        num_outs=5,
-        relu_before_extra_convs=True),
+        num_outs=5),
     bbox_head=dict(
-        type='FCOSHead',
+        type='RetinaHead',
         num_classes=21,
         in_channels=256,
         stacked_convs=4,
         feat_channels=256,
-        strides=[8, 16, 32, 64, 128],
+        octave_base_scale=4,
+        scales_per_octave=3,
+        anchor_ratios=[0.5, 1.0, 2.0],
+        anchor_strides=[8, 16, 32, 64, 128],
+        target_means=[.0, .0, .0, .0],
+        target_stds=[1.0, 1.0, 1.0, 1.0],
         loss_cls=dict(
             type='FocalLoss',
             use_sigmoid=True,
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
-        loss_bbox=dict(type='IoULoss', loss_weight=1.0),
-        loss_centerness=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
+        loss_bbox=dict(type='SmoothL1Loss', beta=0.11, loss_weight=1.0)))
 # training and testing settings
 train_cfg = dict(
     assigner=dict(
@@ -59,17 +60,10 @@ dataset_type = 'VOCDataset'
 data_root = 'data/VOCdevkit/'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
-#img_norm_cfg = dict(
- #   mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(
-        type='Resize',
-        #img_scale=[(1333, 640), (1333, 800)],
-        #multiscale_mode='value',
-        img_scale=(1000, 600),
-        keep_ratio=True),
+    dict(type='Resize', img_scale=(1000, 600), keep_ratio=True),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Normalize', **img_norm_cfg),
     dict(type='Pad', size_divisor=32),
@@ -80,7 +74,6 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-       # img_scale=(1333, 800),
         img_scale=(1000, 600),
         flip=False,
         transforms=[
@@ -96,17 +89,14 @@ data = dict(
     imgs_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
-        type='RepeatDataset',
-        times=3,
-        dataset=dict(
-            type=dataset_type,
+        type=dataset_type,
             ann_file=[
                 data_root + 'VOC2007/ImageSets/Main/trainval.txt',
                 data_root + 'VOC2012/ImageSets/Main/trainval.txt'
             ],
             img_prefix=[data_root + 'VOC2007/', data_root + 'VOC2012/'],
-            pipeline=train_pipeline)),
-    val=dict(
+            pipeline=train_pipeline),
+  val=dict(
         type=dataset_type,
         ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
         img_prefix=data_root + 'VOC2007/',
@@ -116,20 +106,18 @@ data = dict(
         ann_file=data_root + 'VOC2007/ImageSets/Main/test.txt',
         img_prefix=data_root + 'VOC2007/',
         pipeline=test_pipeline))
+
+
 # optimizer
-optimizer = dict(
-    type='SGD',
-    lr=0.01,
-    momentum=0.9,
-    weight_decay=0.0001,
-    paramwise_options=dict(bias_lr_mult=2., bias_decay_mult=0.))
-optimizer_config = dict(grad_clip=None)
+optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0001)
+optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+
 # learning policy
 lr_config = dict(
     policy='step',
     warmup='constant',
-    warmup_iters=500,
-    warmup_ratio=1.0 / 3,
+    warmup_iters=1500,
+    warmup_ratio=1.0 / 4,
     step=[5, 7])
 checkpoint_config = dict(interval=1)
 
@@ -142,10 +130,11 @@ log_config = dict(
     ])
 # yapf:enable
 # runtime settings
-total_epochs = 8  # actual epoch = 8 * 3 = 24
+#total_epochs = 4  # actual epoch = 4 * 3 = 12
+total_epochs = 8
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_torchvision_r101_voc'
+work_dir = './work_dirs/retinanet_r101_voc_baseline_test'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

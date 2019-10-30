@@ -1,7 +1,7 @@
 # model settings
 model = dict(
     type='FCOS',
-    pretrained='torchvision://resnet101',
+    pretrained='open-mmlab://resnet101_caffe',
     backbone=dict(
         type='ResNet',
         depth=101,
@@ -9,7 +9,7 @@ model = dict(
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=False),
-        style='pytorch'),
+        style='caffe'),
     neck=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
@@ -34,7 +34,8 @@ model = dict(
             loss_weight=1.0),
         loss_bbox=dict(type='IoULoss', loss_weight=1.0),
         loss_centerness=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
+            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
+        norm_cfg = dict(type='BN', requires_grad=False)))
 # training and testing settings
 train_cfg = dict(
     assigner=dict(
@@ -58,9 +59,7 @@ test_cfg = dict(
 dataset_type = 'VOCDataset'
 data_root = 'data/VOCdevkit/'
 img_norm_cfg = dict(
-    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
-#img_norm_cfg = dict(
- #   mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
+    mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
@@ -145,7 +144,7 @@ log_config = dict(
 total_epochs = 8  # actual epoch = 8 * 3 = 24
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_torchvision_r101_voc'
+work_dir = './work_dirs/fcos_r101_voc_baseline_noGN'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

@@ -15,12 +15,13 @@ from .rpn import RPN
 from .single_stage import SingleStageDetector
 from .two_stage import TwoStageDetector
 from .anchor_free import AnchorFree
+from .par_saf import PAR_SAF
+from .cas_saf import CAS_SAF
 from .sample_anchor_free import SampleAnchorFree
-
 
 __all__ = [
     'BaseDetector', 'SingleStageDetector', 'TwoStageDetector', 'RPN',
     'FastRCNN', 'FasterRCNN', 'MaskRCNN', 'CascadeRCNN', 'HybridTaskCascade',
     'DoubleHeadRCNN', 'RetinaNet', 'FCOS', 'GridRCNN', 'MaskScoringRCNN',
-    'RepPointsDetector', 'FOVEA', 'AnchorFree','SampleAnchorFree'
+    'RepPointsDetector', 'FOVEA', 'AnchorFree','SampleAnchorFree', 'PAR_SAF', 'CAS_SAF'
 ]

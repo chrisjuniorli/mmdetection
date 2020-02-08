@@ -10,7 +10,7 @@ from .. import builder
 from ..registry import DETECTORS
 from .base import BaseDetector
 from .test_mixins import RPNTestMixin
-
+import pdb
 
 @DETECTORS.register_module
 class CascadeRCNN(BaseDetector, RPNTestMixin):
@@ -158,7 +158,6 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
                       gt_masks=None,
                       proposals=None):
         x = self.extract_feat(img)
-
         losses = dict()
 
         if self.with_rpn:
@@ -210,6 +209,7 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
             rois = bbox2roi([res.bboxes for res in sampling_results])
             bbox_feats = bbox_roi_extractor(x[:bbox_roi_extractor.num_inputs],
                                             rois)
+           # pdb.set_trace()
             if self.with_shared_head:
                 bbox_feats = self.shared_head(bbox_feats)
             cls_score, bbox_pred = bbox_head(bbox_feats)
@@ -220,6 +220,7 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
             for name, value in loss_bbox.items():
                 losses['s{}.{}'.format(i, name)] = (
                     value * lw if 'loss' in name else value)
+           #pdb.set_trace()
 
             # mask head forward and loss
             if self.with_mask:
@@ -258,7 +259,6 @@ class CascadeRCNN(BaseDetector, RPNTestMixin):
                 for name, value in loss_mask.items():
                     losses['s{}.{}'.format(i, name)] = (
                         value * lw if 'loss' in name else value)
-
             # refine bboxes
             if i < self.num_stages - 1:
                 pos_is_gts = [res.pos_is_gt for res in sampling_results]

@@ -1,6 +1,6 @@
-# model settings
+#model settings
 model = dict(
-    type='FCOS',
+    type = 'SampleAnchorFree',
     pretrained='open-mmlab://resnet50_caffe',
     backbone=dict(
         type='ResNet',
@@ -18,9 +18,9 @@ model = dict(
         add_extra_convs=True,
         extra_convs_on_inputs=False,  # use P5
         num_outs=5,
-        relu_before_extra_convs=True),
-    bbox_head=dict(
-        type='FCOSHead',
+        relu_before_extra_convs=True),  
+    bbox_head = dict(
+        type='IOU_SAF_HEAD',
         num_classes=81,
         in_channels=256,
         stacked_convs=4,
@@ -33,8 +33,9 @@ model = dict(
             alpha=0.25,
             loss_weight=1.0),
         loss_bbox=dict(type='IoULoss', loss_weight=1.0),
-        loss_centerness=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
+        IOU_threshold=0.4))
+ #       loss_centerness=dict(
+ #           type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
 # training and testing settings
 train_cfg = dict(
     assigner=dict(
@@ -52,7 +53,7 @@ test_cfg = dict(
     score_thr=0.05,
     nms=dict(type='nms', iou_thr=0.5),
     max_per_img=100)
-# dataset settings
+#data_root = 'data/coco/'
 dataset_type = 'CocoDataset'
 data_root = '/ifp/data/COCO/'
 img_norm_cfg = dict(
@@ -71,6 +72,7 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
+       # img_scale=(1333, 800),
         img_scale=(1333, 800),
         flip=False,
         transforms=[
@@ -97,9 +99,12 @@ data = dict(
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
-        ann_file=data_root + 'annotations/instances_val2017.json',
-        img_prefix=data_root + 'val2017/',
+        #ann_file=data_root + 'annotations/instances_val2017.json',
+        ann_file=data_root + 'annotations/image_info_test-dev2017.json',
+        img_prefix=data_root + 'test2017/',
+        #img_prefix=data_root + 'val2017/',
         pipeline=test_pipeline))
+
 # optimizer
 optimizer = dict(
     type='SGD',
@@ -107,6 +112,7 @@ optimizer = dict(
     momentum=0.9,
     weight_decay=0.0001,
     paramwise_options=dict(bias_lr_mult=2., bias_decay_mult=0.))
+
 optimizer_config = dict(grad_clip=None)
 # learning policy
 lr_config = dict(
@@ -116,6 +122,7 @@ lr_config = dict(
     warmup_ratio=1.0 / 3,
     step=[8, 11])
 checkpoint_config = dict(interval=1)
+
 # yapf:disable
 log_config = dict(
     interval=50,
@@ -129,7 +136,7 @@ total_epochs = 12
 #device_ids = range(4)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_r50_caffe_fpn_gn_1x_4gpu'
+work_dir = './work_dirs/ciou_r50_caffe_fpn_gn_1x_4gpu'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

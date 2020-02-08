@@ -33,7 +33,8 @@ model = dict(
             alpha=0.25,
             loss_weight=1.0),
         loss_bbox=dict(type='IoULoss', loss_weight=1.0),
-        sample_threshold=0.05))
+        square_sample = True,
+        sample_threshold=0.25))
  #       loss_centerness=dict(
  #           type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
 # training and testing settings

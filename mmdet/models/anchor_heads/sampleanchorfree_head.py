@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from mmcv.cnn import normal_init
-
 from mmdet.core import distance2bbox, force_fp32, multi_apply, multiclass_nms
 from ..builder import build_loss
 from ..registry import HEADS
@@ -12,7 +11,6 @@ INF = 1e8
 
 @HEADS.register_module
 class SampleAnchorFreeHead(nn.Module):
-
     def __init__(self,
                  num_classes,
                  in_channels,
@@ -29,6 +27,7 @@ class SampleAnchorFreeHead(nn.Module):
                      loss_weight=1.0),
                  loss_bbox=dict(type='IoULoss', loss_weight=1.0),
                  sample_threshold = 0.5,
+                 square_sample = False,
                  conv_cfg=None,
                  norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)):
         super(SampleAnchorFreeHead, self).__init__()
@@ -46,6 +45,7 @@ class SampleAnchorFreeHead(nn.Module):
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.sample_threshold = sample_threshold
+        self.square_sample = square_sample
         self.fp16_enabled = False
 
         self._init_layers()
@@ -110,10 +110,8 @@ class SampleAnchorFreeHead(nn.Module):
         
         # float to avoid overflow when enabling FP16
         bbox_pred = scale(self.fcos_reg(reg_feat)).float().exp()
-       # return cls_score, bbox_pred
         return cls_score, bbox_pred
 
-    #@force_fp32(apply_to=('cls_scores', 'bbox_preds', 'centernesses'))
     @force_fp32(apply_to=('cls_scores', 'bbox_preds'))
     def loss(self,
              cls_scores,
@@ -127,7 +125,9 @@ class SampleAnchorFreeHead(nn.Module):
         assert len(cls_scores) == len(bbox_preds) #== len(centernesses)
         #　【-2:】 could get [height,width]
         #cls_scores & bbox_preds are outputs
+        #pdb.set_trace()
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
+        #bbox_preds[0].dtype = torch.float32
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                            bbox_preds[0].device)
         #with points, [points+bbox] pred could apply for bbox_pred loss
@@ -144,14 +144,9 @@ class SampleAnchorFreeHead(nn.Module):
             bbox_pred.permute(0, 2, 3, 1).reshape(-1, 4)
             for bbox_pred in bbox_preds
         ]
-        #flatten_centerness = [
-       #     centerness.permute(0, 2, 3, 1).reshape(-1)
-       #     for centerness in centernesses
-        #]
         
         flatten_cls_scores = torch.cat(flatten_cls_scores)
         flatten_bbox_preds = torch.cat(flatten_bbox_preds)
-       # flatten_centerness = torch.cat(flatten_centerness)
     
         flatten_labels = torch.cat(labels)
         flatten_bbox_targets = torch.cat(bbox_targets)
@@ -169,11 +164,15 @@ class SampleAnchorFreeHead(nn.Module):
         centerness_targets = (
             left_right.min(dim=-1)[0] / left_right.max(dim=-1)[0]) * (
                 top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
-        
+        if self.square_sample:
+            centerness_targets = torch.sqrt(centerness_targets)
+            
         sample_threshold = self.sample_threshold
         pos_inds = pos_inds_tem[centerness_targets>sample_threshold]
         pos_inds_ignore = pos_inds_tem[centerness_targets<=sample_threshold]
+       # pdb.set_trace()
         flatten_labels[pos_inds_ignore] = 0
+        
         
         num_pos = len(pos_inds)
         loss_cls = self.loss_cls(
@@ -181,11 +180,9 @@ class SampleAnchorFreeHead(nn.Module):
             avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
 
         pos_bbox_preds = flatten_bbox_preds[pos_inds]
-        #pos_centerness = flatten_centerness[pos_inds]
 
         if num_pos > 0:
             pos_bbox_targets = flatten_bbox_targets[pos_inds]
-           # pos_centerness_targets = self.centerness_target(pos_bbox_targets)
             pos_points = flatten_points[pos_inds]
             pos_decoded_bbox_preds = distance2bbox(pos_points, pos_bbox_preds)
             pos_decoded_target_preds = distance2bbox(pos_points,
@@ -194,13 +191,8 @@ class SampleAnchorFreeHead(nn.Module):
             loss_bbox = self.loss_bbox(
                 pos_decoded_bbox_preds,
                 pos_decoded_target_preds)
-           #     weight=pos_centerness_targets,
-           #     avg_factor=pos_centerness_targets.sum())
-           # loss_centerness = self.loss_centerness(pos_centerness,
-           #                                        pos_centerness_targets)
         else:
             loss_bbox = pos_bbox_preds.sum()
-           # loss_centerness = pos_centerness.sum()
 
         return dict(
             loss_cls=loss_cls,
@@ -212,13 +204,12 @@ class SampleAnchorFreeHead(nn.Module):
     def get_bboxes(self,
                    cls_scores,
                    bbox_preds,
-                  # centernesses,
                    img_metas,
                    cfg,
                    rescale=None):
         assert len(cls_scores) == len(bbox_preds)
         num_levels = len(cls_scores)
-
+        #get 5 featmap sizes [torch.Size([108, 76]), torch.Size([54, 38]), torch.Size([27, 19]), torch.Size([14, 10]), torch.Size([7, 5])]
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         mlvl_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                       bbox_preds[0].device)
@@ -230,13 +221,10 @@ class SampleAnchorFreeHead(nn.Module):
             bbox_pred_list = [
                 bbox_preds[i][img_id].detach() for i in range(num_levels)
             ]
-          #  centerness_pred_list = [
-           #     centernesses[i][img_id].detach() for i in range(num_levels)
-           # ]
+          
             img_shape = img_metas[img_id]['img_shape']
             scale_factor = img_metas[img_id]['scale_factor']
             det_bboxes = self.get_bboxes_single(cls_score_list, bbox_pred_list,
-                                               # centerness_pred_list,
                                                 mlvl_points, img_shape,
                                                 scale_factor, cfg, rescale)
             result_list.append(det_bboxes)
@@ -245,7 +233,6 @@ class SampleAnchorFreeHead(nn.Module):
     def get_bboxes_single(self,
                           cls_scores,
                           bbox_preds,
-                        #  centernesses,
                           mlvl_points,
                           img_shape,
                           scale_factor,
@@ -254,45 +241,35 @@ class SampleAnchorFreeHead(nn.Module):
         assert len(cls_scores) == len(bbox_preds) == len(mlvl_points)
         mlvl_bboxes = []
         mlvl_scores = []
-     #   mlvl_centerness = []
-      #  for cls_score, bbox_pred, centerness, points in zip(
-      #          cls_scores, bbox_preds, centernesses, mlvl_points):
         for cls_score, bbox_pred, points in zip(
             cls_scores, bbox_preds, mlvl_points):
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
             scores = cls_score.permute(1, 2, 0).reshape(
                 -1, self.cls_out_channels).sigmoid()
-          #  centerness = centerness.permute(1, 2, 0).reshape(-1).sigmoid()
 
             bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
             nms_pre = cfg.get('nms_pre', -1)
             if nms_pre > 0 and scores.shape[0] > nms_pre:
-              #  max_scores, _ = (scores * centerness[:, None]).max(dim=1)
-              #  _, topk_inds = max_scores.topk(nms_pre)
                 max_scores, _ = (scores).max(dim=1)
                 _, topk_inds = max_scores.topk(nms_pre)
                 points = points[topk_inds, :]
                 bbox_pred = bbox_pred[topk_inds, :]
                 scores = scores[topk_inds, :]
-               # centerness = centerness[topk_inds]
             bboxes = distance2bbox(points, bbox_pred, max_shape=img_shape)
             mlvl_bboxes.append(bboxes)
             mlvl_scores.append(scores)
-           # mlvl_centerness.append(centerness)
         mlvl_bboxes = torch.cat(mlvl_bboxes)
         if rescale:
             mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor)
         mlvl_scores = torch.cat(mlvl_scores)
         padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
         mlvl_scores = torch.cat([padding, mlvl_scores], dim=1)
-      #  mlvl_centerness = torch.cat(mlvl_centerness)
         det_bboxes, det_labels = multiclass_nms(
             mlvl_bboxes,
             mlvl_scores,
             cfg.score_thr,
             cfg.nms,
             cfg.max_per_img)
-      #      score_factors=mlvl_centerness)
         return det_bboxes, det_labels
 
     def get_points(self, featmap_sizes, dtype, device):

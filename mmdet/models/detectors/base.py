@@ -5,7 +5,7 @@ import mmcv
 import numpy as np
 import pycocotools.mask as maskUtils
 import torch.nn as nn
-
+import pdb
 from mmdet.core import auto_fp16, get_classes, tensor2imgs
 
 
@@ -112,7 +112,7 @@ class BaseDetector(nn.Module):
         for img, img_meta in zip(imgs, img_metas):
             h, w, _ = img_meta['img_shape']
             img_show = img[:h, :w, :]
-
+           # pdb.set_trace()
             bboxes = np.vstack(bbox_result)
             # draw segmentation masks
             if segm_result is not None:
@@ -129,9 +129,12 @@ class BaseDetector(nn.Module):
                 for i, bbox in enumerate(bbox_result)
             ]
             labels = np.concatenate(labels)
+            out_file1 = '/ifp/users/jiachenl/mmdetection/viz/coco/'
+            out_file = out_file1+img_meta['filename'].split('/')[-1]
             mmcv.imshow_det_bboxes(
                 img_show,
                 bboxes,
                 labels,
                 class_names=class_names,
-                score_thr=score_thr)
+                score_thr=score_thr,
+                out_file=out_file)

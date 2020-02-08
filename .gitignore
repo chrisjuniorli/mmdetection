@@ -115,9 +115,11 @@ work_dir
 # custom
 *.pkl
 *.pkl.json
+*.log
 *.log.json
 work_dirs/
-
+outputs/
+scripts/
 # Pytorch
 *.pth
 
@@ -125,3 +127,7 @@ work_dirs/
 *.out
 #batch_output
 batch_outputs
+
+#viz
+viz
+*.jpg

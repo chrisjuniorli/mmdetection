@@ -4,7 +4,7 @@ from mmdet.core import bbox2result
 from .. import builder
 from ..registry import DETECTORS
 from .base import BaseDetector
-
+import pdb
 
 @DETECTORS.register_module
 class SingleStageDetector(BaseDetector):
@@ -55,9 +55,12 @@ class SingleStageDetector(BaseDetector):
                       gt_bboxes_ignore=None):
         x = self.extract_feat(img)
         outs = self.bbox_head(x)
+        #pdb.set_trace()
         loss_inputs = outs + (gt_bboxes, gt_labels, img_metas, self.train_cfg)
+        #pdb.set_trace()
         losses = self.bbox_head.loss(
             *loss_inputs, gt_bboxes_ignore=gt_bboxes_ignore)
+       # pdb.set_trace()
         return losses
 
     def simple_test(self, img, img_meta, rescale=False):

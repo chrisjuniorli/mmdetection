@@ -1,0 +1,16 @@
+#!/bin/bash 
+#SBATCH --job-name="fcos_r50"
+#SBATCH --output="fcos_r50.out"
+#SBATCH --partition=gpux2
+#SBATCH --time=24
+
+CONFIG=${CONFIG:-"./configs/fcos/fcos_r50_caffe_fpn_gn_1x_4gpu.py"}
+GPUS=${GPUS:-2}
+PY_ARGS=${PY_ARGS:-"--validate"}
+PORT=${PORT:-4000}
+
+
+cd ~/mmdetection/
+source activate mmlab
+srun python -m torch.distributed.launch --nproc_per_node=$GPUS  \
+    tools/train_fix.py $CONFIG --launcher pytorch $PY_ARGS

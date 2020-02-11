@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 set -x
 
 PARTITION=$1
@@ -7,8 +6,8 @@ JOB_NAME=$2
 CONFIG=$3
 WORK_DIR=$4
 GPUS=${5:-8}
-GPUS_PER_NODE=${GPUS_PER_NODE:-8}
-CPUS_PER_TASK=${CPUS_PER_TASK:-5}
+GPUS_PER_NODE=${GPUS_PER_NODE:-16}
+CPUS_PER_TASK=${CPUS_PER_TASK:-8}
 SRUN_ARGS=${SRUN_ARGS:-""}
 PY_ARGS=${PY_ARGS:-"--validate"}
 

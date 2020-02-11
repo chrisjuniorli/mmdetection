@@ -1,16 +1,17 @@
 #!/bin/bash 
-#SBATCH --job-name="fcos_r50"
-#SBATCH --output="fcos_r50.out"
-#SBATCH --partition=gpux2
+#SBATCH --job-name="fcos_r50_range"
+#SBATCH --output="fcos_r50_range.out"
+#SBATCH --partition=gpux4
 #SBATCH --time=24
 
-CONFIG=${CONFIG:-"./configs/fcos/fcos_r50_caffe_fpn_gn_1x_4gpu.py"}
-GPUS=${GPUS:-2}
+CONFIG=${CONFIG:-"./configs/fcos/fcos_r50_caffe_fpn_gn_1x_4gpu_range.py"}
+GPUS=${GPUS:-4}
 PY_ARGS=${PY_ARGS:-"--validate"}
-PORT=${PORT:-4000}
+PORT=${PORT:-29500}
 
 
 cd ~/mmdetection/
 source activate mmlab
-srun python -m torch.distributed.launch --nproc_per_node=$GPUS  \
+
+python -m torch.distributed.launch --nproc_per_node=$GPUS --master_port=$PORT \
     tools/train_fix.py $CONFIG --launcher pytorch $PY_ARGS

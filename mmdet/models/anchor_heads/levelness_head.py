@@ -6,6 +6,7 @@ from mmdet.core import distance2bbox, force_fp32, multi_apply, multiclass_nms
 from ..builder import build_loss
 from ..registry import HEADS
 from ..utils import ConvModule, Scale, bias_init_with_prob
+import pdb
 
 INF = 1e8
 
@@ -46,7 +47,7 @@ class levelness_head(nn.Module):
         self.regress_ranges = regress_ranges
         self.loss_cls = build_loss(loss_cls)
         self.loss_bbox = build_loss(loss_bbox)
-        self.loss_centerness = build_loss(loss_centerness)
+        self.loss_levelness = build_loss(loss_levelness)
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
         self.sample = sample
@@ -83,7 +84,7 @@ class levelness_head(nn.Module):
         self.fcos_cls = nn.Conv2d(
             self.feat_channels, self.cls_out_channels, 3, padding=1)
         self.fcos_reg = nn.Conv2d(self.feat_channels, 4, 3, padding=1)
-        self.fcos_centerness = nn.Conv2d(self.feat_channels, 1, 3, padding=1)
+        self.fcos_levelness = nn.Conv2d(self.feat_channels, 1, 3, padding=1)
 
         self.scales = nn.ModuleList([Scale(1.0) for _ in self.strides])
 
@@ -95,7 +96,7 @@ class levelness_head(nn.Module):
         bias_cls = bias_init_with_prob(0.01)
         normal_init(self.fcos_cls, std=0.01, bias=bias_cls)
         normal_init(self.fcos_reg, std=0.01)
-        normal_init(self.fcos_centerness, std=0.01)
+        normal_init(self.fcos_levelness, std=0.01)
 
     def forward(self, feats):
         return multi_apply(self.forward_single, feats, self.scales)
@@ -107,34 +108,36 @@ class levelness_head(nn.Module):
         for cls_layer in self.cls_convs:
             cls_feat = cls_layer(cls_feat)
         cls_score = self.fcos_cls(cls_feat)
-        centerness = self.fcos_centerness(cls_feat)
+        levelness = self.fcos_levelness(cls_feat)
 
         for reg_layer in self.reg_convs:
             reg_feat = reg_layer(reg_feat)
         # scale the bbox_pred of different level
         # float to avoid overflow when enabling FP16
         bbox_pred = scale(self.fcos_reg(reg_feat)).float().exp()
-        return cls_score, bbox_pred, centerness
+        return cls_score, bbox_pred, levelness
 
-    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'centernesses'))
+    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'levelnesses'))
     def loss(self,
              cls_scores,
              bbox_preds,
-             centernesses,
+             levelnesses,
              gt_bboxes,
              gt_labels,
              img_metas,
              cfg,
              gt_bboxes_ignore=None):
-        assert len(cls_scores) == len(bbox_preds) == len(centernesses)
+        assert len(cls_scores) == len(bbox_preds) == len(levelnesses)
+        #pdb.set_trace()
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                            bbox_preds[0].device)
         labels, bbox_targets = self.fcos_target(all_level_points, gt_bboxes,
                                                 gt_labels)
+        #pdb.set_trace()
 
         num_imgs = cls_scores[0].size(0)
-        # flatten cls_scores, bbox_preds and centerness
+        # flatten cls_scores, bbox_preds and levelness
         flatten_cls_scores = [
             cls_score.permute(0, 2, 3, 1).reshape(-1, self.cls_out_channels)
             for cls_score in cls_scores
@@ -143,33 +146,46 @@ class levelness_head(nn.Module):
             bbox_pred.permute(0, 2, 3, 1).reshape(-1, 4)
             for bbox_pred in bbox_preds
         ]
-        flatten_centerness = [
-            centerness.permute(0, 2, 3, 1).reshape(-1)
-            for centerness in centernesses
+        flatten_levelness = [
+            levelness.permute(0, 2, 3, 1).reshape(-1)
+            for levelness in levelnesses
         ]
         flatten_cls_scores = torch.cat(flatten_cls_scores)
         flatten_bbox_preds = torch.cat(flatten_bbox_preds)
-        flatten_centerness = torch.cat(flatten_centerness)
+        flatten_levelness = torch.cat(flatten_levelness)
         flatten_labels = torch.cat(labels)
         flatten_bbox_targets = torch.cat(bbox_targets)
         # repeat points to align with bbox_preds
         flatten_points = torch.cat(
             [points.repeat(num_imgs, 1) for points in all_level_points])
         
+        '''
         pos_inds_tem = flatten_labels.nonzero().reshape(-1)
        # pdb.set_trace()
         pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
         left_right = pos_bbox_targets_tem[:, [0, 2]]
         top_bottom = pos_bbox_targets_tem[:, [1, 3]]
-        centerness_targets = (
+        levelness_targets = (
             left_right.min(dim=-1)[0] / left_right.max(dim=-1)[0]) * (
                 top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
-        centerness_targets = torch.sqrt(centerness_targets)
+        levelness_targets = torch.sqrt(levelness_targets)
         sample_threshold = self.sample_threshold
-        
+        '''
+        #original fcos code
+
+        pos_inds = flatten_labels.nonzero().reshape(-1)
+        num_pos = len(pos_inds)
+        loss_cls = self.loss_cls(
+            flatten_cls_scores, flatten_labels,
+            avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
+
+        pos_bbox_preds = flatten_bbox_preds[pos_inds]
+        pos_levelness = flatten_levelness[pos_inds]
+        #pdb.set_trace()
+        '''
         if self.sample:
-            pos_inds = pos_inds_tem[centerness_targets>sample_threshold]
-            pos_inds_ignore = pos_inds_tem[centerness_targets<=sample_threshold]
+            pos_inds = pos_inds_tem[levelness_targets>sample_threshold]
+            pos_inds_ignore = pos_inds_tem[levelness_targets<=sample_threshold]
             flatten_labels[pos_inds_ignore] = 0
             num_pos = len(pos_inds)
             loss_cls = self.loss_cls(
@@ -183,37 +199,39 @@ class levelness_head(nn.Module):
                 avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
 
         pos_bbox_preds = flatten_bbox_preds[pos_inds]
-        pos_centerness = flatten_centerness[pos_inds]
-
+        pos_levelness = flatten_levelness[pos_inds]
+        '''
         if num_pos > 0:
             pos_bbox_targets = flatten_bbox_targets[pos_inds]
-            pos_centerness_targets = self.centerness_target(pos_bbox_targets)
+            #pos_levelness_targets = self.levelness_target(pos_bbox_targets)
+            pos_levelness_targets = pos_levelness.new_ones(pos_levelness.size())  
             pos_points = flatten_points[pos_inds]
             pos_decoded_bbox_preds = distance2bbox(pos_points, pos_bbox_preds)
             pos_decoded_target_preds = distance2bbox(pos_points,
                                                      pos_bbox_targets)
-            # centerness weighted iou loss
+            # levelness weighted iou loss
             loss_bbox = self.loss_bbox(
                 pos_decoded_bbox_preds,
                 pos_decoded_target_preds,
-                weight=pos_centerness_targets,
-                avg_factor=pos_centerness_targets.sum())
-            loss_centerness = self.loss_centerness(pos_centerness,
-                                                   pos_centerness_targets)
+                weight=pos_levelness_targets,
+                avg_factor=pos_levelness_targets.sum())
+
+            loss_levelness = self.loss_levelness(pos_levelness,
+                                                   pos_levelness_targets)
         else:
             loss_bbox = pos_bbox_preds.sum()
-            loss_centerness = pos_centerness.sum()
+            loss_levelness = pos_levelness.sum()
 
         return dict(
             loss_cls=loss_cls,
             loss_bbox=loss_bbox,
-            loss_centerness=loss_centerness)
+            loss_levelness=loss_levelness)
 
-    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'centernesses'))
+    @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'levelnesses'))
     def get_bboxes(self,
                    cls_scores,
                    bbox_preds,
-                   centernesses,
+                   levelnesses,
                    img_metas,
                    cfg,
                    rescale=None):
@@ -231,13 +249,13 @@ class levelness_head(nn.Module):
             bbox_pred_list = [
                 bbox_preds[i][img_id].detach() for i in range(num_levels)
             ]
-            centerness_pred_list = [
-                centernesses[i][img_id].detach() for i in range(num_levels)
+            levelness_pred_list = [
+                levelnesses[i][img_id].detach() for i in range(num_levels)
             ]
             img_shape = img_metas[img_id]['img_shape']
             scale_factor = img_metas[img_id]['scale_factor']
             det_bboxes = self.get_bboxes_single(cls_score_list, bbox_pred_list,
-                                                centerness_pred_list,
+                                                levelness_pred_list,
                                                 mlvl_points, img_shape,
                                                 scale_factor, cfg, rescale)
             result_list.append(det_bboxes)
@@ -246,7 +264,7 @@ class levelness_head(nn.Module):
     def get_bboxes_single(self,
                           cls_scores,
                           bbox_preds,
-                          centernesses,
+                          levelnesses,
                           mlvl_points,
                           img_shape,
                           scale_factor,
@@ -255,41 +273,41 @@ class levelness_head(nn.Module):
         assert len(cls_scores) == len(bbox_preds) == len(mlvl_points)
         mlvl_bboxes = []
         mlvl_scores = []
-        mlvl_centerness = []
-        for cls_score, bbox_pred, centerness, points in zip(
-                cls_scores, bbox_preds, centernesses, mlvl_points):
+        mlvl_levelness = []
+        for cls_score, bbox_pred, levelness, points in zip(
+                cls_scores, bbox_preds, levelnesses, mlvl_points):
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
             scores = cls_score.permute(1, 2, 0).reshape(
                 -1, self.cls_out_channels).sigmoid()
-            centerness = centerness.permute(1, 2, 0).reshape(-1).sigmoid()
+            levelness = levelness.permute(1, 2, 0).reshape(-1).sigmoid()
 
             bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
             nms_pre = cfg.get('nms_pre', -1)
             if nms_pre > 0 and scores.shape[0] > nms_pre:
-                max_scores, _ = (scores * centerness[:, None]).max(dim=1)
+                max_scores, _ = (scores * levelness[:, None]).max(dim=1)
                 _, topk_inds = max_scores.topk(nms_pre)
                 points = points[topk_inds, :]
                 bbox_pred = bbox_pred[topk_inds, :]
                 scores = scores[topk_inds, :]
-                centerness = centerness[topk_inds]
+                levelness = levelness[topk_inds]
             bboxes = distance2bbox(points, bbox_pred, max_shape=img_shape)
             mlvl_bboxes.append(bboxes)
             mlvl_scores.append(scores)
-            mlvl_centerness.append(centerness)
+            mlvl_levelness.append(levelness)
         mlvl_bboxes = torch.cat(mlvl_bboxes)
         if rescale:
             mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor)
         mlvl_scores = torch.cat(mlvl_scores)
         padding = mlvl_scores.new_zeros(mlvl_scores.shape[0], 1)
         mlvl_scores = torch.cat([padding, mlvl_scores], dim=1)
-        mlvl_centerness = torch.cat(mlvl_centerness)
+        mlvl_levelness = torch.cat(mlvl_levelness)
         det_bboxes, det_labels = multiclass_nms(
             mlvl_bboxes,
             mlvl_scores,
             cfg.score_thr,
             cfg.nms,
             cfg.max_per_img,
-            score_factors=mlvl_centerness)
+            score_factors=mlvl_levelness)
         return det_bboxes, det_labels
 
     def get_points(self, featmap_sizes, dtype, device):
@@ -341,7 +359,7 @@ class levelness_head(nn.Module):
             regress_ranges=concat_regress_ranges)
 
         # split to per img, per level
-        num_points = [center.size(0) for center in points]
+        num_points = [level.size(0) for level in points]
         labels_list = [labels.split(num_points, 0) for labels in labels_list]
         bbox_targets_list = [
             bbox_targets.split(num_points, 0)
@@ -405,11 +423,11 @@ class levelness_head(nn.Module):
 
         return labels, bbox_targets
 
-    def centerness_target(self, pos_bbox_targets):
-        # only calculate pos centerness targets, otherwise there may be nan
+    def levelness_target(self, pos_bbox_targets):
+        # only calculate pos levelness targets, otherwise there may be nan
         left_right = pos_bbox_targets[:, [0, 2]]
         top_bottom = pos_bbox_targets[:, [1, 3]]
-        centerness_targets = (
+        levelness_targets = (
             left_right.min(dim=-1)[0] / left_right.max(dim=-1)[0]) * (
                 top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
-        return torch.sqrt(centerness_targets)
+        return torch.sqrt(levelness_targets)

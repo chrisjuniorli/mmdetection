@@ -20,7 +20,7 @@ model = dict(
         num_outs=5,
         relu_before_extra_convs=True),
     bbox_head=dict(
-        type='FCOSHead',
+        type='levelness_head',
         num_classes=81,
         in_channels=256,
         stacked_convs=4,
@@ -33,10 +33,10 @@ model = dict(
             alpha=0.25,
             loss_weight=1.0),
         loss_bbox=dict(type='IoULoss', loss_weight=1.0),
-        loss_centerness=dict(
+        loss_levelness=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
 # training and testing settings
-train_cfg = dict(
+train_cfg = dict( 
     assigner=dict(
         type='MaxIoUAssigner',
         pos_iou_thr=0.5,
@@ -54,8 +54,8 @@ test_cfg = dict(
     max_per_img=100)
 # dataset settings
 dataset_type = 'CocoDataset'
-#data_root = './data/COCO/'
-data_root = '/ifp/data/COCO/'
+data_root = './data/COCO/'
+#data_root = '/ifp/data/COCO/'
 img_norm_cfg = dict(
     mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
 train_pipeline = [
@@ -130,7 +130,7 @@ total_epochs = 12
 #device_ids = range(4)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_r50_caffe_fpn_gn_1x_4gpu'
+work_dir = './work_dirs/levelness_af_r50_baseline'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

@@ -32,6 +32,7 @@ class FCOSHead(nn.Module):
                      type='CrossEntropyLoss',
                      use_sigmoid=True,
                      loss_weight=1.0),
+                 centerness_reg = False,
                  sample = False,
                  sample_threshold = 0.5,
                  conv_cfg=None,
@@ -52,6 +53,7 @@ class FCOSHead(nn.Module):
         self.norm_cfg = norm_cfg
         self.sample = sample
         self.sample_threshold = sample_threshold
+        self.centerness_reg = centerness_reg
         self.fp16_enabled = False
 
         self._init_layers()
@@ -108,10 +110,15 @@ class FCOSHead(nn.Module):
         for cls_layer in self.cls_convs:
             cls_feat = cls_layer(cls_feat)
         cls_score = self.fcos_cls(cls_feat)
-        centerness = self.fcos_centerness(cls_feat)
 
         for reg_layer in self.reg_convs:
             reg_feat = reg_layer(reg_feat)
+    
+        if self.centerness_reg:
+            centerness = self.fcos_centerness(reg_feat)
+        else:
+            centerness = self.fcos_centerness(cls_feat)
+
         # scale the bbox_pred of different level
         # float to avoid overflow when enabling FP16
         bbox_pred = scale(self.fcos_reg(reg_feat)).float().exp()
@@ -129,9 +136,11 @@ class FCOSHead(nn.Module):
              gt_bboxes_ignore=None):
         assert len(cls_scores) == len(bbox_preds) == len(centernesses)
         #pdb.set_trace()
+        #pdb.set_trace()
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                            bbox_preds[0].device)
+        #all_level_points returns coordinate(x,y) of points on feature map pyramids
         labels, bbox_targets = self.fcos_target(all_level_points, gt_bboxes,
                                                 gt_labels)
         #pdb.set_trace()
@@ -388,6 +397,8 @@ class FCOSHead(nn.Module):
             gt_bboxes[:, 3] - gt_bboxes[:, 1] + 1)
         # TODO: figure out why these two are different
         # areas = areas[None].expand(num_points, num_gts)
+        # each point is assigned with areas of all gt
+
         areas = areas[None].repeat(num_points, 1)
         regress_ranges = regress_ranges[:, None, :].expand(
             num_points, num_gts, 2)
@@ -401,8 +412,9 @@ class FCOSHead(nn.Module):
         top = ys - gt_bboxes[..., 1]
         bottom = gt_bboxes[..., 3] - ys
         bbox_targets = torch.stack((left, top, right, bottom), -1)
-
+        # bbox_target is a tensor with dimension [num_points, num_gts , 4]
         # condition1: inside a gt bbox
+        # inside_gt_bbox_mask is a tensor with dimension [num_points, num_gts]
         inside_gt_bbox_mask = bbox_targets.min(-1)[0] > 0
 
         # condition2: limit the regression range for each location
@@ -416,11 +428,11 @@ class FCOSHead(nn.Module):
         areas[inside_gt_bbox_mask == 0] = INF
         areas[inside_regress_range == 0] = INF
         min_area, min_area_inds = areas.min(dim=1)
-
+        #labels is a tensor [num_points]
         labels = gt_labels[min_area_inds]
         labels[min_area == INF] = 0
         bbox_targets = bbox_targets[range(num_points), min_area_inds]
-
+        #bbox_targets now is [num_points,4]
         return labels, bbox_targets
 
     def centerness_target(self, pos_bbox_targets):

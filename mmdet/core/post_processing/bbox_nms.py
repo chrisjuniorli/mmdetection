@@ -2,7 +2,6 @@ import torch
 
 from mmdet.ops.nms import nms_wrapper
 
-
 def multiclass_nms(multi_bboxes,
                    multi_scores,
                    score_thr,

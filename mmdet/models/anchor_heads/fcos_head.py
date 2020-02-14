@@ -33,8 +33,8 @@ class FCOSHead(nn.Module):
                      use_sigmoid=True,
                      loss_weight=1.0),
                  centerness_reg = False,
-                 sample = False,
-                 sample_threshold = 0.5,
+                 ciou = False,
+                 ciou_threshold = 0.4,
                  conv_cfg=None,
                  norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)):
         super(FCOSHead, self).__init__()
@@ -51,9 +51,9 @@ class FCOSHead(nn.Module):
         self.loss_centerness = build_loss(loss_centerness)
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
-        self.sample = sample
-        self.sample_threshold = sample_threshold
         self.centerness_reg = centerness_reg
+        self.ciou = ciou
+        self.ciou_threshold = ciou_threshold
         self.fp16_enabled = False
 
         self._init_layers()
@@ -168,21 +168,46 @@ class FCOSHead(nn.Module):
         flatten_points = torch.cat(
             [points.repeat(num_imgs, 1) for points in all_level_points])
         
-        '''
-        pos_inds_tem = flatten_labels.nonzero().reshape(-1)
-       # pdb.set_trace()
-        pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
-        left_right = pos_bbox_targets_tem[:, [0, 2]]
-        top_bottom = pos_bbox_targets_tem[:, [1, 3]]
-        centerness_targets = (
-            left_right.min(dim=-1)[0] / left_right.max(dim=-1)[0]) * (
-                top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
-        centerness_targets = torch.sqrt(centerness_targets)
-        sample_threshold = self.sample_threshold
-        '''
         #original fcos code
+        
+        if self.ciou:
+            pos_inds_tem = flatten_labels.nonzero().reshape(-1)        
+            pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
+            left = pos_bbox_targets_tem[:, 0]
+            right = pos_bbox_targets_tem[:, 2]
+            top = pos_bbox_targets_tem[:, 1]
+            bottom = pos_bbox_targets_tem[:, 3]
+            inter_left = left.clone()
+            inter_right = right.clone()
+            inter_top = top.clone()
+            inter_bottom = bottom.clone()
+            half_w = (left+right)/2
+            half_h = (top+bottom)/2
+            for i in range(len(left)):
+                if half_w[i]<left[i]:
+                    inter_left[i] = half_w[i]
+                if half_w[i]<right[i]:
+                    inter_right[i] = half_w[i]
+                if half_h[i]<top[i]:
+                    inter_top[i] = half_h[i]
+                if half_h[i]<bottom[i]:
+                    inter_bottom[i] = half_h[i]
+            area_u = (left+right)*(top+bottom)
+            area_i = (inter_left+inter_right)*(inter_top+inter_bottom)
+            iou_target = area_i/(area_u+area_u-area_i)
+        
+            pos_inds = pos_inds_tem[iou_target>self.ciou_threshold]
+            pos_inds_ignore = pos_inds_tem[iou_target<=self.ciou_threshold]
+            flatten_labels[pos_inds_ignore] = 0
+        
+        else:
+            pos_inds = flatten_labels.nonzero().reshape(-1)
 
-        pos_inds = flatten_labels.nonzero().reshape(-1)
+
+
+
+
+
         num_pos = len(pos_inds)
         loss_cls = self.loss_cls(
             flatten_cls_scores, flatten_labels,
@@ -191,25 +216,7 @@ class FCOSHead(nn.Module):
         pos_bbox_preds = flatten_bbox_preds[pos_inds]
         pos_centerness = flatten_centerness[pos_inds]
         #pdb.set_trace()
-        '''
-        if self.sample:
-            pos_inds = pos_inds_tem[centerness_targets>sample_threshold]
-            pos_inds_ignore = pos_inds_tem[centerness_targets<=sample_threshold]
-            flatten_labels[pos_inds_ignore] = 0
-            num_pos = len(pos_inds)
-            loss_cls = self.loss_cls(
-            flatten_cls_scores, flatten_labels,
-            avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
-        else:
-            pos_inds = flatten_labels.nonzero().reshape(-1)
-            num_pos = len(pos_inds)
-            loss_cls = self.loss_cls(
-                flatten_cls_scores, flatten_labels,
-                avg_factor=num_pos + num_imgs)  # avoid num_pos is 0
-
-        pos_bbox_preds = flatten_bbox_preds[pos_inds]
-        pos_centerness = flatten_centerness[pos_inds]
-        '''
+        
         if num_pos > 0:
             pos_bbox_targets = flatten_bbox_targets[pos_inds]
             pos_centerness_targets = self.centerness_target(pos_bbox_targets)

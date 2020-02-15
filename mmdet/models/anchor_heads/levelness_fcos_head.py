@@ -11,11 +11,11 @@ import pdb
 INF = 1e8
 
 @HEADS.register_module
-class FCOSHead(nn.Module):
+class levelness_FCOSHead(nn.Module):
 
     def __init__(self,
                  num_classes,
-                 in_channels,i
+                 in_channels,
                  feat_channels=256,
                  stacked_convs=4,
                  strides=(4, 8, 16, 32, 64),
@@ -37,7 +37,7 @@ class FCOSHead(nn.Module):
                  ciou_threshold = 0.4,
                  conv_cfg=None,
                  norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)):
-        super(FCOSHead, self).__init__()
+        super(levelness_FCOSHead, self).__init__()
 
         self.num_classes = num_classes
         self.cls_out_channels = num_classes - 1

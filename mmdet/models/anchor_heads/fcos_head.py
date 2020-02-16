@@ -15,7 +15,7 @@ class FCOSHead(nn.Module):
 
     def __init__(self,
                  num_classes,
-                 in_channels,i
+                 in_channels,
                  feat_channels=256,
                  stacked_convs=4,
                  strides=(4, 8, 16, 32, 64),

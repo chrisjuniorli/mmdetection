@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from mmcv.cnn import normal_init
-
 from mmdet.core import distance2bbox, force_fp32, multi_apply, multiclass_nms
 from ..builder import build_loss
 from ..registry import HEADS
@@ -12,7 +11,7 @@ INF = 1e8
 
 @HEADS.register_module
 class levelness_FCOSHead(nn.Module):
-
+    
     def __init__(self,
                  num_classes,
                  in_channels,
@@ -58,7 +57,7 @@ class levelness_FCOSHead(nn.Module):
 
         self._init_layers()
 
-    def _init_layers(self):
+    def _init_layers(self): 
         self.cls_convs = nn.ModuleList()
         self.reg_convs = nn.ModuleList()
         for i in range(self.stacked_convs):
@@ -106,14 +105,14 @@ class levelness_FCOSHead(nn.Module):
     def forward_single(self, x, scale):
         cls_feat = x
         reg_feat = x
-
+        pdb.set_trace()
         for cls_layer in self.cls_convs:
             cls_feat = cls_layer(cls_feat)
         cls_score = self.fcos_cls(cls_feat)
 
         for reg_layer in self.reg_convs:
             reg_feat = reg_layer(reg_feat)
-    
+
         if self.centerness_reg:
             centerness = self.fcos_centerness(reg_feat)
         else:
@@ -121,7 +120,6 @@ class levelness_FCOSHead(nn.Module):
 
         # scale the bbox_pred of different level
         # float to avoid overflow when enabling FP16
-        #pdb.set_trace()
         bbox_pred = scale(self.fcos_reg(reg_feat)).float().exp()
         return cls_score, bbox_pred, centerness
 
@@ -136,15 +134,12 @@ class levelness_FCOSHead(nn.Module):
              cfg,
              gt_bboxes_ignore=None):
         assert len(cls_scores) == len(bbox_preds) == len(centernesses)
-        #pdb.set_trace()
-        #pdb.set_trace()
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                            bbox_preds[0].device)
         #all_level_points returns coordinate(x,y) of points on feature map pyramids
         labels, bbox_targets = self.fcos_target(all_level_points, gt_bboxes,
                                                 gt_labels)
-        #pdb.set_trace()
 
         num_imgs = cls_scores[0].size(0)
         # flatten cls_scores, bbox_preds and centerness

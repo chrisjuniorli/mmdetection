@@ -20,7 +20,7 @@ model = dict(
         num_outs=5,
         relu_before_extra_convs=True),
     bbox_head=dict(
-        type='levelness_head',
+        type='FCOSHead',
         num_classes=81,
         in_channels=256,
         stacked_convs=4,
@@ -32,11 +32,12 @@ model = dict(
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
-        loss_bbox=dict(type='IoULoss', loss_weight=1.0),
-        loss_levelness=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
+        loss_bbox=dict(type='GIoULoss', loss_weight=1.0),
+        loss_centerness=dict(
+            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
+        centerness_reg = True))
 # training and testing settings
-train_cfg = dict( 
+train_cfg = dict(
     assigner=dict(
         type='MaxIoUAssigner',
         pos_iou_thr=0.5,
@@ -130,7 +131,7 @@ total_epochs = 12
 #device_ids = range(4)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/levelness_af_r50_baseline'
+work_dir = './work_dirs/fcos_r50_caffe_fpn_gn_1x_4gpu_centonreg_giou'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

@@ -5,7 +5,7 @@ from mmcv.cnn import xavier_init
 from mmdet.core import auto_fp16
 from ..registry import NECKS
 from ..utils import ConvModule
-
+import pdb
 
 @NECKS.register_module
 class FPN(nn.Module):
@@ -101,7 +101,7 @@ class FPN(nn.Module):
     @auto_fp16()
     def forward(self, inputs):
         assert len(inputs) == len(self.in_channels)
-
+        #pdb.set_trace()
         # build laterals
         laterals = [
             lateral_conv(inputs[i + self.start_level])

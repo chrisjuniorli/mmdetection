@@ -55,7 +55,6 @@ class FCOSHead(nn.Module):
         self.ciou = ciou
         self.ciou_threshold = ciou_threshold
         self.fp16_enabled = False
-
         self._init_layers()
 
     def _init_layers(self):

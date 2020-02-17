@@ -100,12 +100,35 @@ class levelness_FCOSHead(nn.Module):
         normal_init(self.fcos_centerness, std=0.01)
 
     def forward(self, feats):
-        return multi_apply(self.forward_single, feats, self.scales)
+        cls_scores = []
+        bbox_preds = []
+        centernesses = [] 
+        for i in range(len(feats)):
+            cls_feat = feats[i]
+            reg_feat = feats[i]
+            for cls_layer in self.cls_convs:
+                cls_feat = cls_layer(cls_feat)
+            cls_score = self.fcos_cls(cls_feat)
+
+            for reg_layer in self.reg_convs:
+                reg_feat = reg_layer(reg_feat)
+
+            if self.centerness_reg:
+                centerness = self.fcos_centerness(reg_feat)
+            else:
+                centerness = self.fcos_centerness(cls_feat)
+        #pdb.set_trace()
+            bbox_pred = self.scales[i](self.fcos_reg(reg_feat)).float().exp()
+            cls_scores.append(cls_score)
+            bbox_preds.append(bbox_pred)
+            centernesses.append(centerness)
+        return tuple([cls_scores,bbox_preds,centernesses])
+        #multi_apply(self.forward_single, feats, self.scales)
 
     def forward_single(self, x, scale):
         cls_feat = x
         reg_feat = x
-        pdb.set_trace()
+        #pdb.set_trace()
         for cls_layer in self.cls_convs:
             cls_feat = cls_layer(cls_feat)
         cls_score = self.fcos_cls(cls_feat)
@@ -117,7 +140,7 @@ class levelness_FCOSHead(nn.Module):
             centerness = self.fcos_centerness(reg_feat)
         else:
             centerness = self.fcos_centerness(cls_feat)
-
+        #pdb
         # scale the bbox_pred of different level
         # float to avoid overflow when enabling FP16
         bbox_pred = scale(self.fcos_reg(reg_feat)).float().exp()

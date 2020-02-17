@@ -23,7 +23,9 @@ class levelness_FCOS(SingleStageDetector):
                       gt_bboxes_ignore=None):
         #pdb.set_trace()
         x = self.extract_feat(img)
+        #pdb.set_trace()
         outs = self.bbox_head(x)
+        #pdb.set_trace()
         loss_inputs = outs + (gt_bboxes, gt_labels, img_metas, self.train_cfg)
         #pdb.set_trace()
         losses = self.bbox_head.loss(

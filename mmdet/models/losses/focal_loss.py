@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from mmdet.ops import sigmoid_focal_loss as _sigmoid_focal_loss
 from ..registry import LOSSES
 from .utils import weight_reduce_loss
-
+import pdb
 
 # This method is only for debugging
 def py_sigmoid_focal_loss(pred,
@@ -16,6 +16,7 @@ def py_sigmoid_focal_loss(pred,
                           avg_factor=None):
     pred_sigmoid = pred.sigmoid()
     target = target.type_as(pred)
+    #pdb.set_trace()
     pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
     focal_weight = (alpha * target + (1 - alpha) *
                     (1 - target)) * pt.pow(gamma)

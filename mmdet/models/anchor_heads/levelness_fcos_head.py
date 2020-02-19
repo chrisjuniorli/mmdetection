@@ -247,7 +247,7 @@ class levelness_FCOSHead(nn.Module):
         #  flatten_labels[A,1]
         #  A = 5 * points on each level(i)(=Batchsize*H(i)*W(i))
         flatten_labels = torch.cat(labels)
-
+        #pdb.set_trace()
         # flatten_bbox_targets[A,4] 
         flatten_bbox_targets = torch.cat(bbox_targets)
 
@@ -339,6 +339,7 @@ class levelness_FCOSHead(nn.Module):
                    cls_scores,
                    bbox_preds,
                    centernesses,
+                   levelnesses,
                    img_metas,
                    cfg,
                    rescale=None):

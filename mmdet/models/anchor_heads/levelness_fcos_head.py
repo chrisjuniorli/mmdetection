@@ -260,6 +260,7 @@ class levelness_FCOSHead(nn.Module):
         if self.ciou:
             pos_inds_tem = flatten_labels.nonzero().reshape(-1)        
             pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
+            pdb.set_trace()
             left = pos_bbox_targets_tem[:, 0]
             right = pos_bbox_targets_tem[:, 2]
             top = pos_bbox_targets_tem[:, 1]
@@ -343,6 +344,7 @@ class levelness_FCOSHead(nn.Module):
                    img_metas,
                    cfg,
                    rescale=None):
+        #pdb.set_trace()
         assert len(cls_scores) == len(bbox_preds)
         num_levels = len(cls_scores)
 

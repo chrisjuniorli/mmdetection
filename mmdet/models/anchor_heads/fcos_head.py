@@ -32,6 +32,8 @@ class FCOSHead(nn.Module):
                      type='CrossEntropyLoss',
                      use_sigmoid=True,
                      loss_weight=1.0),
+                 center_sampling = False,
+                 center_sampling_threshold = 0.5,
                  centerness_reg = False,
                  ciou = False,
                  ciou_threshold = 0.4,
@@ -53,6 +55,8 @@ class FCOSHead(nn.Module):
         self.norm_cfg = norm_cfg
         self.centerness_reg = centerness_reg
         self.ciou = ciou
+        self.center_sampling_threshold = center_sampling_threshold
+        self.center_sampling = center_sampling
         self.ciou_threshold = ciou_threshold
         self.fp16_enabled = False
         self._init_layers()
@@ -169,7 +173,7 @@ class FCOSHead(nn.Module):
             [points.repeat(num_imgs, 1) for points in all_level_points])
         
         #original fcos code
-        
+        #pdb.set_trace()
         if self.ciou:
             pos_inds_tem = flatten_labels.nonzero().reshape(-1)        
             pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
@@ -199,12 +203,25 @@ class FCOSHead(nn.Module):
             pos_inds = pos_inds_tem[iou_target>self.ciou_threshold]
             pos_inds_ignore = pos_inds_tem[iou_target<=self.ciou_threshold]
             flatten_labels[pos_inds_ignore] = 0
-        
+
+        elif self.center_sampling:
+            #pdb.set_trace()
+            pos_inds_tem = flatten_labels.nonzero().reshape(-1)  
+            pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
+            w_threshold = (pos_bbox_targets_tem[:,0] + pos_bbox_targets_tem[:,2]) * self.center_sampling_threshold
+            h_threshold = (pos_bbox_targets_tem[:,1] + pos_bbox_targets_tem[:,3]) * self.center_sampling_threshold
+            w_diff = torch.abs(pos_bbox_targets_tem[:,0] - pos_bbox_targets_tem[:,2])
+            h_diff = torch.abs(pos_bbox_targets_tem[:,1] - pos_bbox_targets_tem[:,3])
+            w_m = w_diff<=w_threshold
+            h_m = h_diff<=h_threshold 
+            pos = w_m & h_m
+            pos_inds =  pos_inds_tem[pos]
+            pos_inds_ignore =  pos_inds_tem[~pos]
+           # pdb.set_trace()
+            flatten_labels[pos_inds_ignore] = 0
+
         else:
             pos_inds = flatten_labels.nonzero().reshape(-1)
-
-
-
 
 
 

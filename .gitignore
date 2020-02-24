@@ -114,7 +114,9 @@ data
 work_dir
 # custom
 *.pkl
+*.json
 *.pkl.json
+*.pkl.bbox.json
 *.log
 *.log.json
 work_dirs/

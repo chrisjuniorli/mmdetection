@@ -34,9 +34,9 @@ class levelness_FCOSHead(nn.Module):
                      loss_weight=1.0),
                  loss_levelness = dict(
                      type='CrossEntropyLoss',
-                     use_sigmoid=True,
                      loss_weight=0.1),
                  centerness_reg = False,
+                 level_test = False,
                  ciou = False,
                  ciou_threshold = 0.4,
                  conv_cfg=None,
@@ -60,6 +60,7 @@ class levelness_FCOSHead(nn.Module):
         self.ciou = ciou
         self.ciou_threshold = ciou_threshold
         self.fp16_enabled = False
+        self.level_test = level_test
 
         self._init_layers()
 
@@ -260,7 +261,7 @@ class levelness_FCOSHead(nn.Module):
         if self.ciou:
             pos_inds_tem = flatten_labels.nonzero().reshape(-1)        
             pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
-            pdb.set_trace()
+            #pdb.set_trace()
             left = pos_bbox_targets_tem[:, 0]
             right = pos_bbox_targets_tem[:, 2]
             top = pos_bbox_targets_tem[:, 1]
@@ -362,10 +363,14 @@ class levelness_FCOSHead(nn.Module):
             centerness_pred_list = [
                 centernesses[i][img_id].detach() for i in range(num_levels)
             ]
+            levelness_pred_list = [
+                levelnesses[0][img_id].detach()
+            ]
             img_shape = img_metas[img_id]['img_shape']
             scale_factor = img_metas[img_id]['scale_factor']
             det_bboxes = self.get_bboxes_single(cls_score_list, bbox_pred_list,
                                                 centerness_pred_list,
+                                                levelness_pred_list,
                                                 mlvl_points, img_shape,
                                                 scale_factor, cfg, rescale)
             result_list.append(det_bboxes)
@@ -375,35 +380,63 @@ class levelness_FCOSHead(nn.Module):
                           cls_scores,
                           bbox_preds,
                           centernesses,
+                          levelnesses,
                           mlvl_points,
                           img_shape,
                           scale_factor,
                           cfg,
                           rescale=False):
+        #pdb.set_trace()
         assert len(cls_scores) == len(bbox_preds) == len(mlvl_points)
         mlvl_bboxes = []
         mlvl_scores = []
         mlvl_centerness = []
+        #pdb.set_trace()
+        levelnesses = levelnesses[0].permute(1,2,0).softmax(dim=-1)
+        level = 1
         for cls_score, bbox_pred, centerness, points in zip(
                 cls_scores, bbox_preds, centernesses, mlvl_points):
+
             assert cls_score.size()[-2:] == bbox_pred.size()[-2:]
+            h = cls_score.shape[1] 
+            w = cls_score.shape[2] 
             scores = cls_score.permute(1, 2, 0).reshape(
                 -1, self.cls_out_channels).sigmoid()
             centerness = centerness.permute(1, 2, 0).reshape(-1).sigmoid()
-
             bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
             nms_pre = cfg.get('nms_pre', -1)
-            if nms_pre > 0 and scores.shape[0] > nms_pre:
-                max_scores, _ = (scores * centerness[:, None]).max(dim=1)
-                _, topk_inds = max_scores.topk(nms_pre)
-                points = points[topk_inds, :]
-                bbox_pred = bbox_pred[topk_inds, :]
-                scores = scores[topk_inds, :]
-                centerness = centerness[topk_inds]
+            levelness = levelnesses[:,:,level].reshape(1,1,levelnesses.shape[0],levelnesses.shape[1])
+            levelness = F.interpolate(levelness,size=[h,w],mode='area').reshape(-1)
+            level += 1
+            #pdb.set_trace() 
+
+            #self.level_test = False
+            if self.level_test:
+                levelness_all = levelness * centerness 
+                if nms_pre > 0 and scores.shape[0] > nms_pre:
+                    #pdb.set_trace() 
+                    max_scores, _ = (scores * levelness_all[:, None]).max(dim=1)
+                    _, topk_inds = max_scores.topk(nms_pre)
+                    points = points[topk_inds, :]
+                    bbox_pred = bbox_pred[topk_inds, :]
+                    scores = scores[topk_inds, :]
+                    #centerness = centerness[topk_inds]
+                    centerness = levelness[topk_inds]
+            else:
+                if nms_pre > 0 and scores.shape[0] > nms_pre:
+                    #pdb.set_trace() 
+                    max_scores, _ = (scores * centerness[:, None]).max(dim=1)
+                    _, topk_inds = max_scores.topk(nms_pre)
+                    points = points[topk_inds, :]
+                    bbox_pred = bbox_pred[topk_inds, :]
+                    scores = scores[topk_inds, :]
+                    centerness = centerness[topk_inds]
+            
             bboxes = distance2bbox(points, bbox_pred, max_shape=img_shape)
             mlvl_bboxes.append(bboxes)
             mlvl_scores.append(scores)
             mlvl_centerness.append(centerness)
+
         mlvl_bboxes = torch.cat(mlvl_bboxes)
         if rescale:
             mlvl_bboxes /= mlvl_bboxes.new_tensor(scale_factor)

@@ -36,7 +36,7 @@ model = dict(
         loss_centerness=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
         center_sampling = True,
-        center_sampling_threshold = 0.5))
+        center_sampling_threshold = 0.2))
 # training and testing settings
 train_cfg = dict(
     assigner=dict(
@@ -141,7 +141,7 @@ log_config = dict(
 total_epochs = 8  
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_voc_r50/'
+work_dir = './work_dirs/fcos_voc_r50_centersam_02/'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

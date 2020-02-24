@@ -26,6 +26,7 @@ class IOU_SAF_HEAD(nn.Module):
                      alpha=0.25,
                      loss_weight=1.0),
                  loss_bbox=dict(type='IoULoss', loss_weight=1.0),
+                 centerness_reg = False,
                  IOU_threshold = 0.5,
                  conv_cfg=None,
                  norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)):
@@ -42,6 +43,7 @@ class IOU_SAF_HEAD(nn.Module):
         self.loss_bbox = build_loss(loss_bbox)
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
+        self.centerness_reg = centerness_reg
         self.IOU_threshold = IOU_threshold
         self.fp16_enabled = False
         self._init_layers()
@@ -101,7 +103,11 @@ class IOU_SAF_HEAD(nn.Module):
         for reg_layer in self.reg_convs:
             reg_feat = reg_layer(reg_feat)
         # scale the bbox_pred of different level
-        
+        #if self.centerness_reg:
+       #     centerness = self.fcos_centerness(reg_feat)
+        #else:
+        #    centerness = self.fcos_centerness(cls_feat)
+
         # float to avoid overflow when enabling FP16
         bbox_pred = scale(self.fcos_reg(reg_feat)).float().exp()
         return cls_score, bbox_pred

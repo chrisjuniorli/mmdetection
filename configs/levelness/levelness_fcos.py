@@ -35,7 +35,11 @@ model = dict(
         loss_bbox=dict(type='IoULoss', loss_weight=1.0),
         loss_centerness=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        ciou = True,
+        loss_levelness = dict(
+                     type='CrossEntropyLoss',
+                     loss_weight=0.1),
+        level_test = True,
+        ciou = False,
         ciou_threshold = 0.4))
 # training and testing settings
 train_cfg = dict(
@@ -87,13 +91,13 @@ test_pipeline = [
 ]
 data = dict(
     imgs_per_gpu=4,
-    workers_per_gpu=2,
+    workers_per_gpu=4,
     train=dict(
         type=dataset_type,
-        #ann_file=data_root + 'annotations/instances_train2017.json',
-        #img_prefix=data_root + 'train2017/',
-        ann_file=data_root + 'annotations/instances_val2017.json',
-        img_prefix=data_root + 'val2017/',
+        ann_file=data_root + 'annotations/instances_train2017.json',
+        img_prefix=data_root + 'train2017/',
+        #ann_file=data_root + 'annotations/instances_val2017.json',
+        #img_prefix=data_root + 'val2017/',
         pipeline=train_pipeline),
     val=dict(
         type=dataset_type,

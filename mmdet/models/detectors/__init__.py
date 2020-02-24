@@ -19,6 +19,7 @@ from .par_saf import PAR_SAF
 from .cas_saf import CAS_SAF
 from .sample_anchor_free import SampleAnchorFree
 from .levelness_fcos import levelness_FCOS
+#from .atss import ATSS
 
 __all__ = [
     'BaseDetector', 'SingleStageDetector', 'TwoStageDetector', 'RPN',

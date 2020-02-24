@@ -26,7 +26,7 @@ class SampleAnchorFreeHead(nn.Module):
                      alpha=0.25,
                      loss_weight=1.0),
                  loss_bbox=dict(type='IoULoss', loss_weight=1.0),
-                 sample_threshold = 0.5,
+                 sample_threshold = (0.2,0.3,0.4,0.5,0.6),
                  square_sample = False,
                  conv_cfg=None,
                  norm_cfg=dict(type='GN', num_groups=32, requires_grad=True)):
@@ -125,7 +125,6 @@ class SampleAnchorFreeHead(nn.Module):
         assert len(cls_scores) == len(bbox_preds) #== len(centernesses)
         #　【-2:】 could get [height,width]
         #cls_scores & bbox_preds are outputs
-        #pdb.set_trace()
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         #bbox_preds[0].dtype = torch.float32
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
@@ -134,6 +133,39 @@ class SampleAnchorFreeHead(nn.Module):
         labels, bbox_targets = self.fcos_target(all_level_points, gt_bboxes,
                                                 gt_labels)
         
+        #pdb.set_trace()
+        for i in range(len(labels)):
+            #pdb.set_trace()
+            pos_inds_tem = labels[i].nonzero().reshape(-1)
+            #print(len(pos_inds_tem))
+            pos_bbox_targets_tem = bbox_targets[i][pos_inds_tem]
+            left = pos_bbox_targets_tem[:, 0]
+            right = pos_bbox_targets_tem[:, 2]
+            top = pos_bbox_targets_tem[:, 1]
+            bottom = pos_bbox_targets_tem[:, 3]
+            inter_left = left.clone()
+            inter_right = right.clone()
+            inter_top = top.clone()
+            inter_bottom = bottom.clone()
+            half_w = (left+right)/2
+            half_h = (top+bottom)/2
+            for j in range(len(left)):
+                if half_w[j]<left[j]:
+                    inter_left[j] = half_w[j]
+                if half_w[j]<right[j]:
+                    inter_right[j] = half_w[j]
+                if half_h[j]<top[j]:
+                    inter_top[j] = half_h[j]
+                if half_h[j]<bottom[j]:
+                    inter_bottom[j] = half_h[j]
+            area_u = (left+right)*(top+bottom)
+            area_i = (inter_left+inter_right)*(inter_top+inter_bottom)
+            iou_target = area_i/(area_u+area_u-area_i)
+            pos_inds = pos_inds_tem[iou_target>self.sample_threshold[i]]
+            #print(len(pos_inds_tem),len(pos_inds))
+            pos_inds_ignore = pos_inds_tem[iou_target<=self.sample_threshold[i]]
+            labels[i][pos_inds_ignore] = 0
+        #.set_trace()
         num_imgs = cls_scores[0].size(0)
         # flatten cls_scores, bbox_preds and centerness
         flatten_cls_scores = [
@@ -147,7 +179,8 @@ class SampleAnchorFreeHead(nn.Module):
         
         flatten_cls_scores = torch.cat(flatten_cls_scores)
         flatten_bbox_preds = torch.cat(flatten_bbox_preds)
-    
+
+
         flatten_labels = torch.cat(labels)
         flatten_bbox_targets = torch.cat(bbox_targets)
         
@@ -156,24 +189,9 @@ class SampleAnchorFreeHead(nn.Module):
             [points.repeat(num_imgs, 1) for points in all_level_points])
         
         #!!!!positive samples assign with sampler!!!!
-        pos_inds_tem = flatten_labels.nonzero().reshape(-1)
-       # pdb.set_trace()
-        pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
-        left_right = pos_bbox_targets_tem[:, [0, 2]]
-        top_bottom = pos_bbox_targets_tem[:, [1, 3]]
-        centerness_targets = (
-            left_right.min(dim=-1)[0] / left_right.max(dim=-1)[0]) * (
-                top_bottom.min(dim=-1)[0] / top_bottom.max(dim=-1)[0])
-        if self.square_sample:
-            centerness_targets = torch.sqrt(centerness_targets)
-            
-        sample_threshold = self.sample_threshold
-        pos_inds = pos_inds_tem[centerness_targets>sample_threshold]
-        pos_inds_ignore = pos_inds_tem[centerness_targets<=sample_threshold]
-       # pdb.set_trace()
-        flatten_labels[pos_inds_ignore] = 0
-        
-        
+
+        #pdb.set_trace()
+        pos_inds = flatten_labels.nonzero().reshape(-1)
         num_pos = len(pos_inds)
         loss_cls = self.loss_cls(
             flatten_cls_scores, flatten_labels,
@@ -308,6 +326,7 @@ class SampleAnchorFreeHead(nn.Module):
         #num_levels mean the levels of all feature maps
         num_levels = len(points)
         # expand regress ranges to align with points
+        #.set_trace()
         expanded_regress_ranges = [
             points[i].new_tensor(self.regress_ranges[i])[None].expand_as(
                 points[i]) for i in range(num_levels)

@@ -1,6 +1,6 @@
 # model settings
 model = dict(
-    type='levelness_FCOS',
+    type='FCOS',
     pretrained='open-mmlab://resnet50_caffe',
     backbone=dict(
         type='ResNet',
@@ -20,7 +20,7 @@ model = dict(
         num_outs=5,
         relu_before_extra_convs=True),
     bbox_head=dict(
-        type='levelness_FCOSHead',
+        type='SampleAnchorFreeHead',
         num_classes=21,
         in_channels=256,
         stacked_convs=4,
@@ -32,15 +32,8 @@ model = dict(
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
-        loss_bbox=dict(type='GIoULoss', loss_weight=1.0),
-        loss_centerness=dict(
-            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_levelness = dict(
-                     type='CrossEntropyLoss',
-                     loss_weight=0.1),
-        centerness_reg = True,
-        ciou = True,
-        level_test = True))
+        loss_bbox=dict(type='IoULoss', loss_weight=1.0),
+        sample_threshold = [0.4,0.4,0.4,0.4,0.4]))
 # training and testing settings
 train_cfg = dict(
     assigner=dict(
@@ -130,7 +123,7 @@ lr_config = dict(
     warmup='constant',
     warmup_iters=500,
     warmup_ratio=1.0 / 4,
-    step=[8, 10])
+    step=[8, 11])
 checkpoint_config = dict(interval=1)
 
 # yapf:disable
@@ -145,7 +138,7 @@ log_config = dict(
 total_epochs = 12  
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_r50_voc_levelness_all_12e/'
+work_dir = './work_dirs/ciou_voc_r50_balance_baseline/'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

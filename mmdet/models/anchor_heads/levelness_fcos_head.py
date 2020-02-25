@@ -181,19 +181,18 @@ class levelness_FCOSHead(nn.Module):
              centernesses,
              levelnesses,
              gt_bboxes,
-             gt_labels,
+             gt_la
              img_metas,
              cfg,
              gt_bboxes_ignore=None):
-        #pdb.set_trace()
         assert len(cls_scores) == len(bbox_preds) == len(centernesses)
         featmap_sizes = [featmap.size()[-2:] for featmap in cls_scores]
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                            bbox_preds[0].device)
         #all_level_points returns coordinate(x,y) of points on feature map pyramids in the original image
+        #pdb.set_trace()
         labels, bbox_targets = self.fcos_target(all_level_points, gt_bboxes,
                                                gt_labels)
-        #pdb.set_trace()
         num_imgs = cls_scores[0].size(0)
         level_lables = labels.copy()
         height = levelnesses[0].shape[2]
@@ -391,7 +390,7 @@ class levelness_FCOSHead(nn.Module):
         mlvl_bboxes = []
         mlvl_scores = []
         mlvl_centerness = []
-        #pdb.set_trace()
+        #pdb.set_t race()
         levelnesses = levelnesses[0].permute(1,2,0).softmax(dim=-1)
         level = 1
         for cls_score, bbox_pred, centerness, points in zip(
@@ -406,11 +405,8 @@ class levelness_FCOSHead(nn.Module):
             bbox_pred = bbox_pred.permute(1, 2, 0).reshape(-1, 4)
             nms_pre = cfg.get('nms_pre', -1)
             levelness = levelnesses[:,:,level].reshape(1,1,levelnesses.shape[0],levelnesses.shape[1])
-            levelness = F.interpolate(levelness,size=[h,w],mode='area').reshape(-1)
+            levelness = F.interpolate(levelness,size=[h,w],mode='bilinear').reshape(-1)
             level += 1
-            #pdb.set_trace() 
-
-            #self.level_test = False
             if self.level_test:
                 levelness_all = levelness * centerness 
                 if nms_pre > 0 and scores.shape[0] > nms_pre:
@@ -421,7 +417,7 @@ class levelness_FCOSHead(nn.Module):
                     bbox_pred = bbox_pred[topk_inds, :]
                     scores = scores[topk_inds, :]
                     #centerness = centerness[topk_inds]
-                    centerness = levelness[topk_inds]
+                    centerness = centerness[topk_inds]
             else:
                 if nms_pre > 0 and scores.shape[0] > nms_pre:
                     #pdb.set_trace() 
@@ -447,7 +443,8 @@ class levelness_FCOSHead(nn.Module):
         det_bboxes, det_labels = multiclass_nms(
             mlvl_bboxes,
             mlvl_scores,
-            cfg.score_thr,
+            #cfg.score_thr,
+            0.01,
             cfg.nms,
             cfg.max_per_img,
             score_factors=mlvl_centerness)

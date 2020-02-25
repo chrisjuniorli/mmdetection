@@ -187,9 +187,6 @@ class SampleAnchorFreeHead(nn.Module):
         # repeat points to align with bbox_preds
         flatten_points = torch.cat(
             [points.repeat(num_imgs, 1) for points in all_level_points])
-        
-        #!!!!positive samples assign with sampler!!!!
-
         #pdb.set_trace()
         pos_inds = flatten_labels.nonzero().reshape(-1)
         num_pos = len(pos_inds)

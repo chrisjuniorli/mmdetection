@@ -129,6 +129,7 @@ class IOU_SAF_HEAD(nn.Module):
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                            bbox_preds[0].device)
         #with points, [points+bbox] pred could apply for bbox_pred loss
+        pdb.set_trace()
         labels, bbox_targets = self.fcos_target(all_level_points, gt_bboxes,
                                                 gt_labels)
         

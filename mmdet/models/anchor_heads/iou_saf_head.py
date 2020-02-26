@@ -129,7 +129,6 @@ class IOU_SAF_HEAD(nn.Module):
         all_level_points = self.get_points(featmap_sizes, bbox_preds[0].dtype,
                                            bbox_preds[0].device)
         #with points, [points+bbox] pred could apply for bbox_pred loss
-        pdb.set_trace()
         labels, bbox_targets = self.fcos_target(all_level_points, gt_bboxes,
                                                 gt_labels)
         
@@ -159,7 +158,6 @@ class IOU_SAF_HEAD(nn.Module):
         #flatten_bbox_targets 0 left 1 top 2 right 3 bottom 
         
         pos_inds_tem = flatten_labels.nonzero().reshape(-1)
-        #pdb.set_trace()
         
         pos_bbox_targets_tem = flatten_bbox_targets[pos_inds_tem]
         left = pos_bbox_targets_tem[:, 0]
@@ -184,7 +182,6 @@ class IOU_SAF_HEAD(nn.Module):
         area_u = (left+right)*(top+bottom)
         area_i = (inter_left+inter_right)*(inter_top+inter_bottom)
         iou_target = area_i/(area_u+area_u-area_i)
-        #pdb.set_trace()
         
         pos_inds = pos_inds_tem[iou_target>self.IOU_threshold]
         pos_inds_ignore = pos_inds_tem[iou_target<=self.IOU_threshold]
@@ -387,7 +384,7 @@ class IOU_SAF_HEAD(nn.Module):
         xs, ys = points[:, 0], points[:, 1]
         xs = xs[:, None].expand(num_points, num_gts)
         ys = ys[:, None].expand(num_points, num_gts)
-
+        #.set_trace()
         left = xs - gt_bboxes[..., 0]
         right = gt_bboxes[..., 2] - xs
         top = ys - gt_bboxes[..., 1]
@@ -411,6 +408,7 @@ class IOU_SAF_HEAD(nn.Module):
         # in the next areas.min operation
         areas[inside_gt_bbox_mask == 0] = INF
         areas[inside_regress_range == 0] = INF
+        ## dim=1 compare between each GT
         min_area, min_area_inds = areas.min(dim=1)
         
         labels = gt_labels[min_area_inds]

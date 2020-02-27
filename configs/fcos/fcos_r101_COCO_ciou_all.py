@@ -63,7 +63,7 @@ test_cfg = dict(
 #data_root = 'data/VOCdevkit/'
 
 dataset_type = 'CocoDataset'
-data_root = '/ifp/data/COCO/'
+data_root = './data/COCO/'
 img_norm_cfg = dict(
     mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
 

@@ -54,8 +54,8 @@ test_cfg = dict(
     max_per_img=100)
 # dataset settings
 dataset_type = 'CocoDataset'
-#data_root = './data/COCO/'
-data_root = '/ifp/data/COCO/'
+data_root = './data/COCO/'
+#data_root = '/ifp/data/COCO/'
 img_norm_cfg = dict(
     mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
 train_pipeline = [

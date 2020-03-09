@@ -36,7 +36,7 @@ model = dict(
         loss_centerness=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
         centerness_reg = True,
-        ciou_threshold = [0.6,0.5,0.4,0.3,0.2],
+        ciou_threshold = [0.4,0.4,0.4,0.4,0.4],
         ciou = True))
 # training and testing settings
 train_cfg = dict(
@@ -86,8 +86,8 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    imgs_per_gpu=4,
-    workers_per_gpu=4,
+    imgs_per_gpu=2,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
         ann_file=data_root + 'annotations/instances_train2017.json',
@@ -132,7 +132,7 @@ total_epochs = 12
 #device_ids = range(4)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_r50_ciou_balance'
+work_dir = './work_dirs/fcos_r50_ciou_fp16'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

@@ -1,7 +1,7 @@
 # model settings
 model = dict(
     type='FCOS',
-    pretrained='open-mmlab://resnet50_caffe',
+    pretrained='torchvision://resnet50',
     backbone=dict(
         type='ResNet',
         depth=50,
@@ -9,7 +9,20 @@ model = dict(
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=False),
-        style='caffe'),
+        style='pytorch'),
+    '''
+    backbone=dict(
+        type='ResNet',
+        depth=50,
+        num_stages=4,
+        out_indices=(0, 1, 2, 3),
+        frozen_stages=1,
+        style='pytorch',
+        norm_cfg=dict(type='BN', requires_grad=False),
+        dcn=dict(
+            modulated=True, deformable_groups=4, fallback_on_stride=False),
+        stage_with_dcn=(False, True, True, True)),
+    '''
     neck=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
@@ -36,7 +49,7 @@ model = dict(
         loss_centerness=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
         centerness_reg = True,
-        ciou_threshold = [0.6,0.5,0.4,0.3,0.2],
+        ciou_threshold = [0.4,0.4,0.4,0.4,0.4],
         ciou = True))
 # training and testing settings
 train_cfg = dict(
@@ -59,7 +72,9 @@ test_cfg = dict(
 dataset_type = 'CocoDataset'
 data_root = './data/COCO/'
 img_norm_cfg = dict(
-    mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+#img_norm_cfg = dict(
+ #   mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
@@ -132,7 +147,7 @@ total_epochs = 12
 #device_ids = range(4)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_r50_ciou_balance'
+work_dir = './work_dirs/fcos_r50_ciou_baseline'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

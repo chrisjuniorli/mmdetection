@@ -1,7 +1,7 @@
 # model settings
 model = dict(
-    type='levelness_FCOS',
-    pretrained='open-mmlab://resnet50_caffe',
+    type='FCOS',
+    pretrained='torchvision://resnet50',
     backbone=dict(
         type='ResNet',
         depth=50,
@@ -9,7 +9,10 @@ model = dict(
         out_indices=(0, 1, 2, 3),
         frozen_stages=1,
         norm_cfg=dict(type='BN', requires_grad=False),
-        style='caffe'),
+	dcn = dict(
+	      modulated=False, deformable_groups=1,fallback_on_stride=False),
+        stage_with_dcn = (False, True, True, True),
+        style='pytorch'),
     neck=dict(
         type='FPN',
         in_channels=[256, 512, 1024, 2048],
@@ -20,7 +23,7 @@ model = dict(
         num_outs=5,
         relu_before_extra_convs=True),
     bbox_head=dict(
-        type='levelness_FCOSHead',
+        type='FCOSHead',
         num_classes=81,
         in_channels=256,
         stacked_convs=4,
@@ -35,14 +38,9 @@ model = dict(
         loss_bbox=dict(type='IoULoss', loss_weight=1.0),
         loss_centerness=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0),
-        loss_levelness = dict(
-                     type='CrossEntropyLoss',
-                     use_sigmoid = True,
-                     loss_weight=0.2),
         centerness_reg = True,
-        ciou = True,
-        level_test = False,
-        use_cc = True))
+        ciou_threshold = [0.4,0.4,0.4,0.4,0.4],
+        ciou = True))
 # training and testing settings
 train_cfg = dict(
     assigner=dict(
@@ -63,9 +61,10 @@ test_cfg = dict(
 # dataset settings
 dataset_type = 'CocoDataset'
 data_root = './data/COCO/'
-#data_root = '/ifp/data/COCO/'
 img_norm_cfg = dict(
-    mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+#img_norm_cfg = dict(
+ #   mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
@@ -138,7 +137,7 @@ total_epochs = 12
 #device_ids = range(4)
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_r50_COCO_levelness'
+work_dir = './work_dirs/fcos_r50_ciou_dcnv1_g1'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

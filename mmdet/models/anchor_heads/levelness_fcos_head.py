@@ -416,8 +416,8 @@ class levelness_FCOSHead(nn.Module):
                 bboxes = F.interpolate(bboxes,size=[levelnesses.shape[0],levelnesses.shape[1]],mode='nearest').permute(0,2,3,1).reshape(-1,4)
                 scores = F.interpolate(scores,size=[levelnesses.shape[0],levelnesses.shape[1]],mode='nearest').permute(0,2,3,1).reshape(-1,self.cls_out_channels)
                 centerness = F.interpolate(centerness,size=[levelnesses.shape[0],levelnesses.shape[1]],mode='nearest').permute(0,2,3,1).reshape(-1)
-                level_index = one_hot[:,:,level].reshape(-1)
-                #level_index = levelnesses[:,:,level].reshape(-1)
+                #level_index = one_hot[:,:,level].reshape(-1)
+                level_index = levelnesses[:,:,level].reshape(-1)
                 level_index = level_index*centerness
                 if nms_pre > 0 and scores.shape[0] > nms_pre:
                     max_scores, _ = (scores * centerness[:, None]).max(dim=1)

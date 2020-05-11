@@ -63,7 +63,7 @@ test_cfg = dict(
 #data_root = 'data/VOCdevkit/'
 
 dataset_type = 'CocoDataset'
-data_root = './data/COCO/'
+data_root = 'data/COCO/'
 img_norm_cfg = dict(
     mean=[102.9801, 115.9465, 122.7717], std=[1.0, 1.0, 1.0], to_rgb=False)
 
@@ -114,9 +114,9 @@ data = dict(
     test=dict(
         type=dataset_type,
         ann_file=data_root + 'annotations/image_info_test-dev2017.json',
-        img_prefix=data_root + 'test2017/',
+        #img_prefix=data_root + 'test2017/',
         #ann_file=data_root + 'annotations/instances_val2017.json',
-        #img_prefix=data_root + 'val2017/',
+        img_prefix=data_root + 'val2017/',
         pipeline=test_pipeline))
 '''
 data = dict(
@@ -173,7 +173,7 @@ log_config = dict(
 total_epochs = 24  
 dist_params = dict(backend='nccl')
 log_level = 'INFO'
-work_dir = './work_dirs/fcos_r101_COCO_ciou_all'
+work_dir = './work_dirs/fcos_r101_COCO_ciou_all_range'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]

@@ -15,7 +15,6 @@ def cross_entropy(pred, label, weight=None, reduction='mean', avg_factor=None):
         weight = weight.float()
     loss = weight_reduce_loss(
         loss, weight=weight, reduction=reduction, avg_factor=avg_factor)
-
     return loss
 
 

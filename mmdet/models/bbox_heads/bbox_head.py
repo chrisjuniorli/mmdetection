@@ -8,7 +8,7 @@ from mmdet.core import (auto_fp16, bbox_target, delta2bbox, force_fp32,
 from ..builder import build_loss
 from ..losses import accuracy
 from ..registry import HEADS
-
+import pdb
 
 @HEADS.register_module
 class BBoxHead(nn.Module):
@@ -138,6 +138,7 @@ class BBoxHead(nn.Module):
                        scale_factor,
                        rescale=False,
                        cfg=None):
+        #.set_trace()
         if isinstance(cls_score, list):
             cls_score = sum(cls_score) / float(len(cls_score))
         scores = F.softmax(cls_score, dim=1) if cls_score is not None else None
@@ -164,7 +165,7 @@ class BBoxHead(nn.Module):
                                                     cfg.score_thr, cfg.nms,
                                                     cfg.max_per_img)
 
-            return det_bboxes, det_labels
+            return det_bboxes, det_labels#, stats
 
     @force_fp32(apply_to=('bbox_preds', ))
     def refine_bboxes(self, rois, labels, bbox_preds, pos_is_gts, img_metas):

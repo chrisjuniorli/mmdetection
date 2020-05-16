@@ -6,4 +6,4 @@ terminaltables
 pycocotools
 torch>=1.1
 torchvision
-#imagecorruptions
+imagecorruptions

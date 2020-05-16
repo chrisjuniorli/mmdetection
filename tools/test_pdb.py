@@ -4,7 +4,7 @@ import os.path as osp
 import shutil
 import tempfile
 import pdb
-
+import numpy as np
 import mmcv
 import torch
 import torch.distributed as dist
@@ -20,20 +20,22 @@ from mmdet.models import build_detector
 def single_gpu_test(model, data_loader, show=False):
     model.eval()
     results = []
+    stats = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, rescale=not show, **data)
+            result,stat = model(return_loss=False, rescale=not show, **data)
         results.append(result)
-
+        stats.append(stat)
+        
         if show:
             model.module.show_result(data, result)
 
         batch_size = data['img'][0].size(0)
         for _ in range(batch_size):
             prog_bar.update()
-    return results
+    return results,stats
 
 
 def multi_gpu_test(model, data_loader, tmpdir=None):
@@ -159,6 +161,7 @@ def main():
 
     # build the dataloader
     # TODO: support multiple images per gpu (only minor changes are needed)
+    #pdb.set_trace()
     dataset = build_dataset(cfg.data.test)
     data_loader = build_dataloader(
         dataset,
@@ -182,12 +185,16 @@ def main():
 
     if not distributed:
         model = MMDataParallel(model, device_ids=[0])
-        outputs = single_gpu_test(model, data_loader, args.show)
+        outputs,stat = single_gpu_test(model, data_loader, args.show)
     else:
         model = MMDistributedDataParallel(model.cuda())
         outputs = multi_gpu_test(model, data_loader, args.tmpdir)
 
     rank, _ = get_dist_info()
+    stat = np.asarray(stat)
+    stat_all = np.sum(stat,0)
+    print(stat_all)
+    print(stat_all/stat_all.sum())
     #pdb.set_trace()
     if args.out and rank == 0:
         print('\nwriting results to {}'.format(args.out))

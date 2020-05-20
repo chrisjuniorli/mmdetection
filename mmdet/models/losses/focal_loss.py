@@ -36,8 +36,10 @@ def sigmoid_focal_loss(pred,
     # Function.apply does not accept keyword arguments, so the decorator
     # "weighted_loss" is not applicable
     loss = _sigmoid_focal_loss(pred, target, gamma, alpha)
+    #pdb.set_trace()
     # TODO: find a proper way to handle the shape of weight
     if weight is not None:
+        #.view is reshape(-1,1)
         weight = weight.view(-1, 1)
     loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
     return loss

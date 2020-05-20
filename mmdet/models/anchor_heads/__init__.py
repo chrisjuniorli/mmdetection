@@ -15,11 +15,12 @@ from .par_saf_head import PAR_SAF_HEAD
 from .levelness_iou import levelness_iou
 from .levelness_head import levelness_head
 from .levelness_fcos_head import levelness_FCOSHead
+from .piou_head import PIOUHead
 #from .atss_head import ATSSHead
 
 __all__ = [
     'AnchorHead', 'GuidedAnchorHead', 'FeatureAdaption', 'RPNHead',
     'GARPNHead', 'RetinaHead', 'GARetinaHead', 'SSDHead', 'FCOSHead',
     'RepPointsHead', 'FoveaHead','AnchorFreeHead','SampleAnchorFreeHead',
-    'PAR_SAF_HEAD','IOU_SAF_HEAD','levelness_iou','levelness_head','levelness_FCOSHead'
+    'PAR_SAF_HEAD','IOU_SAF_HEAD','levelness_iou','levelness_head','levelness_FCOSHead','PIOUHead'
 ]
